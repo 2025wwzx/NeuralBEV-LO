@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neuralbev-lo"
+version = "0.1.0"
+description = "Learning-based LiDAR odometry for streaming 4D BEV memory."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = { text = "MIT" }
+authors = [
+  { name = "2025wwzx" }
+]
+dependencies = [
+  "numpy>=1.24",
+  "pyyaml>=6.0",
+  "tqdm>=4.66",
+  "matplotlib>=3.8",
+  "opencv-python-headless>=4.8"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0"
+]
+torch = [
+  "torch>=2.5"
+]
+viz = [
+  "open3d>=0.18"
+]
+eval = [
+  "evo>=1.30"
+]
+
+[tool.setuptools.packages.find]
+include = ["neuralbev_lo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

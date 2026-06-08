@@ -1,0 +1,29 @@
+experiment:
+  name: posenet_3dof
+  seed: 20260608
+
+data:
+  dataset_config: configs/dataset/kitti.yaml
+  smoke_sequences: ["00"]
+  train_sequences: ["00", "01", "02", "03", "04", "05", "06"]
+  val_sequences: ["07", "08"]
+  test_sequences: ["09", "10"]
+
+bev:
+  x_range_m: [0.0, 70.0]
+  y_range_m: [-35.0, 35.0]
+  resolution_m: 0.5
+  channels: ["density", "max_height", "mean_height", "intensity"]
+
+pose:
+  target_dof: 3
+  label_frame: previous_lidar
+  pose_norm:
+    source_split: train
+    strategy: train_split_mean_std
+
+training:
+  batch_size: 4
+  epochs: 1
+  optimizer: AdamW
+  amp: true

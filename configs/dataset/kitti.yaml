@@ -1,0 +1,15 @@
+dataset:
+  name: kitti_odometry
+  data_root_env: KITTI_ROOT
+  default_data_root: data/kitti_odometry
+  sequence_format: "{seq:02d}"
+  expected_layout:
+    sequences_dir: sequences
+    velodyne_dir: velodyne
+    calib_file: calib.txt
+    times_file: times.txt
+    poses_dir: poses
+
+smoke:
+  sequence: "00"
+  max_frames: 20

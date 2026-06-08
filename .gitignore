@@ -1,0 +1,37 @@
+# Runtime data and generated artifacts
+data/kitti_odometry/
+data/raw/
+data/cache/
+outputs/
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.npy
+*.npz
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.venv/
+venv/
+env/
+
+# Notebooks and editor state
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# Local secrets and machine-specific config
+.env
+.env.*
+!.env.example
+local_config*.yaml
+
+# OS files
+Thumbs.db
+.DS_Store

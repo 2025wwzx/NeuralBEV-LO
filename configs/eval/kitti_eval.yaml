@@ -1,0 +1,19 @@
+experiment:
+  name: kitti_eval
+  seed: 20260608
+
+data:
+  dataset_config: configs/dataset/kitti.yaml
+  demo_sequences: ["09", "10"]
+
+bev_memory:
+  policy: decay
+  alpha: 0.9
+  temporal_window: 5
+
+metrics:
+  occupancy_threshold: 0.1
+  selected_channels: ["density"]
+  flicker_window: 5
+  alignment_score: mean_iou
+  flicker_score: mean_pixel_std
