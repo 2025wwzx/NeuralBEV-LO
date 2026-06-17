@@ -13,7 +13,10 @@ NeuralBEV-LO is an open-source research prototype, not a production autonomous-d
 
 ## Current Scope
 
-The Week 1 deliverable establishes the project skeleton, configuration layout, data contract, coordinate-system contract, structured logging helper, environment diagnostics, and smoke tests. Modeling code, KITTI parsing, BEV rasterization, and training are intentionally deferred to later phases in `NeuralBEV-LO-execution-plan.md`.
+The project has reached the M1 data-to-BEV baseline: KITTI Odometry loading,
+single-frame BEV rendering, and GT-pose BEV memory demos are runnable. The
+current Week 5 focus is the adjacent-frame pair dataset and train-only 3DoF
+pose-label normalization pipeline for the first PoseNet training loop.
 
 ## Environment
 
@@ -43,6 +46,34 @@ python -m pytest
 python -c "import neuralbev_lo"
 python scripts/run_pipeline_smoke.py --synthetic
 ```
+
+## KITTI M1 Demo Commands
+
+After placing KITTI Odometry under `data/kitti_odometry/`, either as a merged
+`sequences/` + `poses/` root or as the official split `data_odometry_*` folders:
+
+```powershell
+python scripts/preview_sequence.py --config configs/dataset/kitti.yaml --sequence 00 --data-root data/kitti_odometry
+python scripts/render_bev_frame.py --config configs/train/posenet_3dof.yaml --sequence 00 --frame-index 0 --data-root data/kitti_odometry
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --sequence 00 --frames 100 --data-root data/kitti_odometry
+```
+
+The memory demo writes a current / naive / GT-pose BEV comparison image under
+`outputs/figures/`.
+
+## KITTI Week 5 Label Preview
+
+The default pose target is adjacent-frame `dx, dy, yaw` in the previous
+LiDAR/BEV frame. Pose normalization statistics are computed from train
+sequences `00`-`06` only and recorded in `configs/train/posenet_3dof.yaml`.
+
+```powershell
+python scripts/preview_pose_labels.py --config configs/train/posenet_3dof.yaml --sequence 00 --data-root data/kitti_odometry --max-pairs 20
+python scripts/preview_pose_labels.py --config configs/train/posenet_3dof.yaml --data-root data/kitti_odometry --write-stats outputs/metrics/pose_label_stats_train.json
+```
+
+The pair dataset API returns `(bev_prev, bev_curr, target_pose_3dof, metadata)`
+and is covered by `tests/test_pair_dataset.py`.
 
 ## Data
 

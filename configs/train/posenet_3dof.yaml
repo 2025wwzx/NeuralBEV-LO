@@ -21,6 +21,14 @@ pose:
   pose_norm:
     source_split: train
     strategy: train_split_mean_std
+    label_order: ["dx_m", "dy_m", "yaw_rad"]
+    sequences: ["00", "01", "02", "03", "04", "05", "06"]
+    count: 15230
+    mean: [1.0261731147766113, -0.0002028998569585383, -0.00004391550100990571]
+    std: [0.469381719827652, 0.02020873874425888, 0.017427677288651466]
+    min: [-0.015585881657898426, -0.245121568441391, -0.0743253156542778]
+    max: [2.738995313644409, 0.31214556097984314, 0.08329317718744278]
+    generated_by: scripts/preview_pose_labels.py
 
 training:
   batch_size: 4

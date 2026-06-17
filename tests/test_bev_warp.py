@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+from math import pi
+
 import numpy as np
 import torch
 
 from neuralbev_lo.bev.rasterizer import BevGridConfig
 from neuralbev_lo.bev.warp import warp_bev
-from neuralbev_lo.geometry.se2 import se2_from_xyyaw
+from neuralbev_lo.geometry.se2 import invert_se2, se2_from_xyyaw
 
 
 def _tiny_config() -> BevGridConfig:
@@ -21,6 +23,24 @@ def _tiny_config() -> BevGridConfig:
         resolution_m=1.0,
         channels=("density",),
     )
+
+
+def _symmetric_config() -> BevGridConfig:
+    """构造围绕物理原点对称的 BEV 配置，用于旋转测试。"""
+
+    return BevGridConfig(
+        x_range_m=(-4.0, 4.0),
+        y_range_m=(-4.0, 4.0),
+        resolution_m=1.0,
+        channels=("density",),
+    )
+
+
+def _argmax_cell(bev: torch.Tensor) -> tuple[int, int]:
+    """返回单通道 BEV 最大值所在的 `(row, col)`。"""
+
+    max_index = torch.nonzero(bev[0] == bev[0].max(), as_tuple=False)[0]
+    return int(max_index[0]), int(max_index[1])
 
 
 def test_warp_identity_keeps_bev_values() -> None:
@@ -43,9 +63,35 @@ def test_warp_translation_moves_density_cell() -> None:
     bev[0, 3, 4] = 1.0
 
     warped = warp_bev(bev, se2_from_xyyaw(1.0, 0.0, 0.0), config)
-    max_index = torch.nonzero(warped[0] == warped[0].max(), as_tuple=False)[0]
 
-    assert tuple(int(value) for value in max_index.tolist()) == (2, 4)
+    assert _argmax_cell(warped) == (2, 4)
+
+
+def test_warp_yaw_rotates_around_physical_origin() -> None:
+    """yaw warp 应围绕 BEV 物理原点旋转，而不是围绕图像中心近似旋转。"""
+
+    config = _symmetric_config()
+    bev = np.zeros((1, 8, 8), dtype=np.float32)
+    bev[0, 5, 4] = 1.0
+
+    warped = warp_bev(bev, se2_from_xyyaw(0.0, 0.0, pi / 2.0), config)
+
+    assert _argmax_cell(warped) == (4, 2)
+
+
+def test_warp_inverse_transform_recovers_translated_cell() -> None:
+    """对同一 BEV 先 warp 再用逆变换 warp，应恢复原始 cell。"""
+
+    config = _tiny_config()
+    bev = np.zeros((1, 8, 8), dtype=np.float32)
+    bev[0, 3, 4] = 1.0
+    transform = se2_from_xyyaw(1.0, 0.0, 0.0)
+
+    moved = warp_bev(bev, transform, config)
+    recovered = warp_bev(moved, invert_se2(transform), config)
+
+    assert _argmax_cell(recovered) == (3, 4)
+    assert float(recovered.max()) > 0.99
 
 
 def test_warp_large_translation_pads_with_zeros() -> None:
@@ -73,7 +119,7 @@ def test_warp_ten_meter_forward_translation_matches_week4_gate() -> None:
     bev[0, 80, 40] = 1.0
 
     warped = warp_bev(bev, se2_from_xyyaw(10.0, 0.0, 0.0), config)
-    max_index = torch.nonzero(warped[0] == warped[0].max(), as_tuple=False)[0]
+    max_row, max_col = _argmax_cell(warped)
 
-    assert abs(int(max_index[0]) - 40) <= 1
-    assert abs(int(max_index[1]) - 40) <= 1
+    assert abs(max_row - 40) <= 1
+    assert abs(max_col - 40) <= 1
