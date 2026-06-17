@@ -96,3 +96,38 @@ notes:
   This is a smoke-scale Week 6 baseline, not a full KITTI training run.
   The CLI supports both --overfit-batches and --overfit_batches spellings.
 ```
+
+## 2026-06-17 Week 7 Odometry Eval Smoke
+
+```text
+date: 2026-06-17
+run_id: week7_odometry_eval_smoke
+config: configs/train/posenet_3dof.yaml
+dataset:
+  synthetic eval with 6 adjacent pairs
+  KITTI Odometry sequence 07 tiny eval with 5 adjacent pairs
+checkpoint:
+  outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt
+commands:
+  python -m pytest tests/test_odometry_eval.py
+  python -m pytest
+  python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --synthetic --max-pairs 6 --output-dir outputs/metrics/week7_synthetic_eval
+  python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --data-root data/kitti_odometry --sequence 07 --max-pairs 5 --cpu --output-dir outputs/metrics/week7_kitti_tiny_eval
+result:
+  Week 7 tests passed: 5 passed in tests/test_odometry_eval.py.
+  Full test suite passed: 52 passed.
+  Synthetic eval saved metrics and trajectory; gt_label_echo ATE is 0.0 and zero_motion ATE is 1.764426.
+  KITTI tiny eval saved zero_motion, constant_velocity, gt_label_echo, and learned baselines.
+  KITTI tiny learned ATE is 2.794398, worse than zero_motion ATE 0.295942.
+artifacts:
+  outputs/metrics/week7_synthetic_eval/synthetic_eval_metrics.json
+  outputs/metrics/week7_synthetic_eval/synthetic_eval_metrics.csv
+  outputs/metrics/week7_synthetic_eval/synthetic_eval_trajectory.png
+  outputs/metrics/week7_kitti_tiny_eval/07_eval_metrics.json
+  outputs/metrics/week7_kitti_tiny_eval/07_eval_metrics.csv
+  outputs/metrics/week7_kitti_tiny_eval/07_eval_trajectory.png
+notes:
+  The learned checkpoint is smoke-scale and not expected to beat baselines yet.
+  This records the Week 7 accepted failure case: learned pose does not beat zero-motion on KITTI tiny eval.
+  Full KITTI training or a stronger overfit checkpoint is needed before claiming learned odometry quality.
+```

@@ -88,6 +88,20 @@ python scripts/train_posenet_3dof.py --config configs/train/posenet_3dof.yaml --
 
 Checkpoints are generated under `outputs/checkpoints/` and are not committed.
 
+## Week 7 Odometry Eval Commands
+
+Week 7 evaluates relative-pose baselines and integrates short trajectories. The
+current smoke-scale learned checkpoint is expected to be weak; failures are
+logged instead of hidden.
+
+```powershell
+python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --synthetic --max-pairs 6 --output-dir outputs/metrics/week7_synthetic_eval
+python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --data-root data/kitti_odometry --sequence 07 --max-pairs 5 --cpu --output-dir outputs/metrics/week7_kitti_tiny_eval
+```
+
+The eval command writes metrics JSON/CSV and a trajectory overlay PNG under the
+chosen output directory.
+
 ## Data
 
 Large datasets are not committed. See `data/README.md` for the expected KITTI layout and environment-variable options.
