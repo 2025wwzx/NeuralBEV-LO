@@ -19,6 +19,7 @@ REQUIRED_DOCS: Final[tuple[str, ...]] = (
     "docs/m3_report.md",
     "docs/resume_notes.md",
     "docs/release_checklist.md",
+    "docs/release_notes_v0_1.md",
 )
 
 REQUIRED_SCRIPTS: Final[tuple[str, ...]] = (
@@ -38,8 +39,17 @@ README_REQUIRED_PHRASES: Final[tuple[str, ...]] = (
     "Limitations",
     "data/README.md",
     "docs/release_checklist.md",
+    "docs/release_notes_v0_1.md",
     "scripts/run_v0_1_release_demo.py",
     "scripts/write_v0_1_report.py",
+)
+
+RELEASE_NOTES_REQUIRED_PHRASES: Final[tuple[str, ...]] = (
+    "NeuralBEV-LO v0.1 Research Prototype Release Notes",
+    "Reproduce The Release Demo",
+    "Metrics Snapshot",
+    "Limitations",
+    "v0.1-research-prototype",
 )
 
 RUNTIME_PATHS: Final[tuple[str, ...]] = (
@@ -136,6 +146,7 @@ def collect_release_readiness(
         "required_docs": _check_required_paths(root, REQUIRED_DOCS),
         "required_scripts": _check_required_paths(root, REQUIRED_SCRIPTS),
         "readme_release_content": _check_readme_content(root),
+        "release_notes_content": _check_release_notes_content(root),
         "runtime_artifacts_ignored": _check_runtime_ignored(root),
         "no_tracked_runtime_artifacts": _check_no_tracked_runtime_artifacts(root),
         "release_tag": _check_release_tag(root),
@@ -170,6 +181,27 @@ def _check_readme_content(root: Path) -> ReadinessCheck:
             detail=f"missing phrases: {', '.join(missing)}",
         )
     return ReadinessCheck(name="readme_release_content", status="pass", detail="release section present")
+
+
+def _check_release_notes_content(root: Path) -> ReadinessCheck:
+    """检查 v0.1 release notes 是否包含可发布的关键段落。"""
+
+    release_notes_path = root / "docs/release_notes_v0_1.md"
+    if not release_notes_path.exists():
+        return ReadinessCheck(
+            name="release_notes_content",
+            status="fail",
+            detail="docs/release_notes_v0_1.md missing",
+        )
+    text = release_notes_path.read_text(encoding="utf-8")
+    missing = [phrase for phrase in RELEASE_NOTES_REQUIRED_PHRASES if phrase not in text]
+    if missing:
+        return ReadinessCheck(
+            name="release_notes_content",
+            status="fail",
+            detail=f"missing phrases: {', '.join(missing)}",
+        )
+    return ReadinessCheck(name="release_notes_content", status="pass", detail="release notes ready")
 
 
 def _check_runtime_ignored(root: Path) -> ReadinessCheck:

@@ -364,6 +364,7 @@ artifacts:
   outputs/metrics/week12_m3_freeze/07_000000_000004_memory_metrics.json
   outputs/metrics/week12_m3_freeze/07_000000_000004_consistency_metrics.json
   docs/release_checklist.md
+  docs/release_notes_v0_1.md
 notes:
   No release tag was created in this run. Create and push v0.1-research-prototype only after explicit user approval.
   data/, outputs/, work/, checkpoints, and raw arrays remain ignored runtime artifacts and must not be committed.

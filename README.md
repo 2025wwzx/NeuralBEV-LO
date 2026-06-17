@@ -226,6 +226,7 @@ python scripts/check_release_readiness.py --allow-pending-tag
 
 See `docs/release_checklist.md` before tagging. The tag
 `v0.1-research-prototype` must only be created after explicit user approval.
+Release-note copy is staged in `docs/release_notes_v0_1.md`.
 
 ## Data
 
@@ -250,5 +251,6 @@ Large datasets are not committed. See `data/README.md` for the expected KITTI la
 - `docs/architecture.md` - evolving architecture notes.
 - `docs/m3_report.md` - Week 11 M3 demo and technical report summary.
 - `docs/release_checklist.md` - Week 12 reproducibility and tag checklist.
+- `docs/release_notes_v0_1.md` - GitHub release-note draft for v0.1.
 - `docs/experiment_log.md` - experiment and failure-case log.
 - `docs/resume_notes.md` - artifact-backed resume wording.

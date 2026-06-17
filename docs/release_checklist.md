@@ -17,6 +17,7 @@ not claim production odometry accuracy.
 - [x] Failure cases and limitations are documented in `docs/experiment_log.md`.
 - [x] Architecture and coordinate-system docs are present.
 - [x] Resume notes are artifact-backed and include the 4D BEV wording guardrail.
+- [x] v0.1 GitHub release-note draft exists in `docs/release_notes_v0_1.md`.
 - [x] `data/`, `outputs/`, `work/`, checkpoints, and raw arrays are ignored by git.
 - [x] `scripts/check_release_readiness.py --allow-pending-tag` passes.
 - [x] `scripts/check_release_readiness.py --allow-pending-tag --require-artifacts` passes after running the one-command release demo.
@@ -49,7 +50,8 @@ python scripts/check_release_readiness.py --allow-pending-tag
 ## Tagging
 
 Tagging is intentionally manual. After reviewing the generated artifacts and this
-checklist, the user can approve:
+checklist, and the release-note draft in `docs/release_notes_v0_1.md`, the user
+can approve:
 
 ```powershell
 git tag v0.1-research-prototype

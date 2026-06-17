@@ -39,6 +39,7 @@ def _make_minimal_release_repo(root: Path) -> None:
                 "Limitations",
                 "data/README.md",
                 "docs/release_checklist.md",
+                "docs/release_notes_v0_1.md",
                 "scripts/run_v0_1_release_demo.py",
                 "scripts/write_v0_1_report.py",
             ]
@@ -52,6 +53,7 @@ def _make_minimal_release_repo(root: Path) -> None:
         "docs/m3_report.md",
         "docs/resume_notes.md",
         "docs/release_checklist.md",
+        "docs/release_notes_v0_1.md",
         "scripts/check_env.py",
         "scripts/run_pipeline_smoke.py",
         "scripts/train_posenet_3dof.py",
@@ -63,6 +65,18 @@ def _make_minimal_release_repo(root: Path) -> None:
         "scripts/check_release_readiness.py",
     ]:
         _write_text(root / path)
+    _write_text(
+        root / "docs/release_notes_v0_1.md",
+        "\n".join(
+            [
+                "NeuralBEV-LO v0.1 Research Prototype Release Notes",
+                "Reproduce The Release Demo",
+                "Metrics Snapshot",
+                "Limitations",
+                "v0.1-research-prototype",
+            ]
+        ),
+    )
     _write_text(root / "data/README.md")
 
 
@@ -130,8 +144,10 @@ def test_release_readiness_checks_current_repo() -> None:
 
     assert result.passed, result.format_text()
     assert "required_docs" in result.checks
+    assert result.checks["required_docs"].detail == "9 paths present"
     assert result.checks["required_scripts"].detail == "9 paths present"
     assert result.checks["readme_release_content"].status == "pass"
+    assert result.checks["release_notes_content"].status == "pass"
     assert "runtime_artifacts_ignored" in result.checks
     assert "no_tracked_runtime_artifacts" in result.checks
     assert result.checks["release_tag"].status == "pending"
