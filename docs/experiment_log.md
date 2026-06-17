@@ -316,3 +316,46 @@ notes:
   README, architecture notes, resume notes, and m3_report.md now tie claims to saved commands and artifact paths.
   "4D BEV" means a 2D BEV memory evolving over time, not a dense x/y/z/t reconstruction.
 ```
+
+## 2026-06-17 Week 12 Cleanup, Reproducibility Freeze, and v0.1 Packaging
+
+```text
+date: 2026-06-17
+run_id: week12_v0_1_reproducibility_freeze
+commands:
+  python scripts/check_env.py
+  python scripts/run_pipeline_smoke.py --synthetic
+  python -m pytest
+  python scripts/train_posenet_3dof.py --config configs/train/posenet_3dof.yaml --synthetic --cpu --epochs 1 --batch-size 4 --overfit-batches 4 --output-dir outputs/checkpoints/week12_synthetic_freeze
+  python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --synthetic --max-pairs 6 --output-dir outputs/metrics/week12_synthetic_eval
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week12_m3_freeze --metrics-dir outputs/metrics/week12_m3_freeze
+  python scripts/build_m3_demo_video.py --memory-image outputs/figures/week12_m3_freeze/07_000000_000004_memory.png --trajectory-image outputs/figures/week12_m3_freeze/07_000000_000004_trajectory.png --output outputs/figures/week12_m3_freeze/neuralbev_lo_v0_1_demo.mp4 --seconds 6 --fps 6 --title "NeuralBEV-LO v0.1 research prototype"
+  python scripts/check_release_readiness.py --allow-pending-tag
+result:
+  Environment check completed on Python 3.12.10 with RTX 5080 CUDA-enabled PyTorch.
+  Synthetic data-to-model smoke completed with loss 0.136254.
+  Full test suite passed: 67 passed.
+  Synthetic training freeze saved outputs/checkpoints/week12_synthetic_freeze/posenet_3dof_latest.pt with train_loss 0.075349 and val_loss 0.107954.
+  Synthetic eval wrote zero_motion, constant_velocity, and gt_label_echo baselines; gt_label_echo ATE is 0.0.
+  KITTI M3 freeze wrote memory metrics, consistency metrics, figures, and v0.1 demo video.
+  v0.1 demo video exists with 36 frames at 6 FPS.
+  Release readiness passed all static checks except release_tag, which is intentionally pending until user approval.
+metrics:
+  final occupancy_iou: naive 0.689678, gt_pose 1.0, learned_pose 0.542051.
+  mean per-frame consistency: naive alignment 0.744705 / flicker 0.001996; gt_pose alignment 0.791612 / flicker 0.008939; learned_pose alignment 0.612804 / flicker 0.026458.
+artifacts:
+  outputs/checkpoints/week12_synthetic_freeze/posenet_3dof_latest.pt
+  outputs/metrics/week12_synthetic_eval/synthetic_eval_metrics.json
+  outputs/metrics/week12_synthetic_eval/synthetic_eval_metrics.csv
+  outputs/metrics/week12_synthetic_eval/synthetic_eval_trajectory.png
+  outputs/figures/week12_m3_freeze/07_000000_000004_memory.png
+  outputs/figures/week12_m3_freeze/07_000000_000004_trajectory.png
+  outputs/figures/week12_m3_freeze/07_000000_000004_alignment_curve.png
+  outputs/figures/week12_m3_freeze/neuralbev_lo_v0_1_demo.mp4
+  outputs/metrics/week12_m3_freeze/07_000000_000004_memory_metrics.json
+  outputs/metrics/week12_m3_freeze/07_000000_000004_consistency_metrics.json
+  docs/release_checklist.md
+notes:
+  No release tag was created in this run. Create and push v0.1-research-prototype only after explicit user approval.
+  data/, outputs/, work/, checkpoints, and raw arrays remain ignored runtime artifacts and must not be committed.
+```
