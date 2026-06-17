@@ -13,10 +13,28 @@ NeuralBEV-LO is an open-source research prototype, not a production autonomous-d
 
 ## Current Scope
 
-The project has reached the M1 data-to-BEV baseline: KITTI Odometry loading,
-single-frame BEV rendering, and GT-pose BEV memory demos are runnable. The
-current Week 5 focus is the adjacent-frame pair dataset and train-only 3DoF
-pose-label normalization pipeline for the first PoseNet training loop.
+The project has reached the Week 11/M3 research-demo stage: KITTI Odometry
+loading, BEV rasterization, GT-pose memory, lightweight PoseNet relative-pose
+inference, learned-pose memory comparison, odometry/BEV metrics, failure-case
+logging, and a short demo video are runnable. The learned checkpoint is still a
+smoke-scale prototype and is documented as weak; GT-pose memory remains the
+upper-bound reference.
+
+## Architecture
+
+The v0.1 pipeline stays deliberately small:
+
+```text
+KITTI Velodyne + poses
+  -> validated point clouds and LiDAR poses
+  -> BEV tensors
+  -> adjacent 3DoF labels
+  -> PoseNet3DoF relative-pose prediction
+  -> temporal BEV memory update
+  -> odometry, BEV consistency metrics, figures, and M3 demo video
+```
+
+See `docs/architecture.md` for the architecture and coordinate-system diagrams.
 
 ## Environment
 
@@ -151,9 +169,46 @@ prints stage logs for data loading, rasterization, inference, BEV warp, and
 rendering. These logs are for bottleneck diagnosis only; they are not benchmark
 numbers unless the hardware, data range, and thread settings are fixed.
 
+## Week 11 M3 Demo and Report
+
+The M3 demo uses the Week 10 CPU-safe learned-memory path, then combines the
+memory comparison image and trajectory overlay into an MP4. The memory image
+contains current BEV, naive memory, GT-pose memory, and learned-pose memory; the
+trajectory image shows GT, naive, and learned short trajectories.
+
+```powershell
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week11_m3_demo --metrics-dir outputs/metrics/week11_m3_demo
+python scripts/build_m3_demo_video.py --memory-image outputs/figures/week11_m3_demo/07_000000_000004_memory.png --trajectory-image outputs/figures/week11_m3_demo/07_000000_000004_trajectory.png --output outputs/figures/week11_m3_demo/neuralbev_lo_m3_demo.mp4 --seconds 6 --fps 6 --title "NeuralBEV-LO M3 KITTI seq07 smoke demo"
+```
+
+Generated M3 artifacts:
+
+- `outputs/figures/week11_m3_demo/neuralbev_lo_m3_demo.mp4`
+- `outputs/figures/week11_m3_demo/07_000000_000004_memory.png`
+- `outputs/figures/week11_m3_demo/07_000000_000004_trajectory.png`
+- `outputs/figures/week11_m3_demo/07_000000_000004_alignment_curve.png`
+- `outputs/metrics/week11_m3_demo/07_000000_000004_memory_metrics.json`
+- `docs/m3_report.md`
+
+On the current smoke run, learned-pose memory remains worse than naive memory
+(`occupancy_iou` 0.542051 vs 0.689678), while GT-pose memory is the reference
+upper bound (`occupancy_iou` 1.0). This is a reproducibility and integration
+demo, not a claim of production odometry accuracy.
+
 ## Data
 
 Large datasets are not committed. See `data/README.md` for the expected KITTI layout and environment-variable options.
+
+## Limitations
+
+- "4D BEV" in this repository means a 2D BEV memory evolving over time, not a
+  dense `(x, y, z, t)` reconstruction.
+- The current PoseNet checkpoint is smoke-scale and is not trained enough to
+  beat simple baselines on KITTI tiny validation.
+- BEV consistency metrics use density-channel occupancy by default; they do not
+  prove global map correctness or height consistency.
+- `data/`, `outputs/`, and checkpoints are runtime artifacts and must not be
+  committed.
 
 ## Documentation
 
@@ -161,5 +216,6 @@ Large datasets are not committed. See `data/README.md` for the expected KITTI la
 - `docs/data_contract.md` - dataset and artifact rules.
 - `docs/coordinate_system.md` - KITTI pose, LiDAR pose, BEV grid, and warp conventions.
 - `docs/architecture.md` - evolving architecture notes.
+- `docs/m3_report.md` - Week 11 M3 demo and technical report summary.
 - `docs/experiment_log.md` - experiment and failure-case log.
 - `docs/resume_notes.md` - artifact-backed resume wording.

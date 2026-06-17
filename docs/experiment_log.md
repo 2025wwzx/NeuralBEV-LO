@@ -281,3 +281,38 @@ notes:
   Runtime logs are local diagnostic numbers; do not compare them across machines without fixed hardware and thread settings.
   data/ and outputs/ remain git-ignored runtime directories and must not be committed.
 ```
+
+## 2026-06-17 Week 11 M3 Demo, Documentation, and Technical Report
+
+```text
+date: 2026-06-17
+run_id: week11_m3_demo
+config: configs/eval/kitti_cpu_smoke_safe.yaml
+train_config: configs/train/posenet_3dof.yaml
+dataset: KITTI Odometry sequence 07, first 5 frames
+checkpoint: outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt
+commands:
+  python -m pytest tests/test_m3_demo_video.py
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week11_m3_demo --metrics-dir outputs/metrics/week11_m3_demo
+  python scripts/build_m3_demo_video.py --memory-image outputs/figures/week11_m3_demo/07_000000_000004_memory.png --trajectory-image outputs/figures/week11_m3_demo/07_000000_000004_trajectory.png --output outputs/figures/week11_m3_demo/neuralbev_lo_m3_demo.mp4 --seconds 6 --fps 6 --title "NeuralBEV-LO M3 KITTI seq07 smoke demo"
+result:
+  M3 video tests passed: 2 passed in tests/test_m3_demo_video.py.
+  M3 demo video generated with 36 frames at 6 FPS.
+  The video combines the memory panel and trajectory overlay.
+  learned_pose final occupancy_iou 0.542051 remains worse than naive 0.689678; gt_pose remains 1.0.
+  learned_pose mean alignment 0.612804 and flicker 0.026458 are worse than naive alignment 0.744705 and flicker 0.001996.
+artifacts:
+  outputs/figures/week11_m3_demo/neuralbev_lo_m3_demo.mp4
+  outputs/figures/week11_m3_demo/07_000000_000004_memory.png
+  outputs/figures/week11_m3_demo/07_000000_000004_trajectory.png
+  outputs/figures/week11_m3_demo/07_000000_000004_alignment_curve.png
+  outputs/metrics/week11_m3_demo/07_000000_000004_memory_metrics.json
+  outputs/metrics/week11_m3_demo/07_000000_000004_consistency_metrics.json
+  docs/architecture.md
+  docs/resume_notes.md
+  docs/m3_report.md
+notes:
+  This is an M3 integration demo and technical-report checkpoint, not a claim that learned odometry is strong.
+  README, architecture notes, resume notes, and m3_report.md now tie claims to saved commands and artifact paths.
+  "4D BEV" means a 2D BEV memory evolving over time, not a dense x/y/z/t reconstruction.
+```
