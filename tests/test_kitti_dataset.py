@@ -17,7 +17,7 @@ from neuralbev_lo.data.kitti_dataset import (
 
 
 def _write_fake_kitti_sequence(root, sequence: str = "00", frame_count: int = 2) -> None:
-    """写入最小 KITTI Odometry 测试目录。"""
+    """写入最小 KITTI Odometry 合并布局测试目录。"""
 
     sequence_dir = root / "sequences" / sequence
     velodyne_dir = sequence_dir / "velodyne"
@@ -49,11 +49,53 @@ def _write_fake_kitti_sequence(root, sequence: str = "00", frame_count: int = 2)
         points.tofile(velodyne_dir / f"{index:06d}.bin")
 
 
+def _write_fake_split_kitti_sequence(root, sequence: str = "00", frame_count: int = 2) -> None:
+    """写入官方 KITTI Odometry 三个 zip 分开解压后的最小测试目录。"""
+
+    calib_sequence_dir = root / "data_odometry_calib" / "dataset" / "sequences" / sequence
+    velodyne_dir = (
+        root
+        / "data_odometry_velodyne"
+        / "dataset"
+        / "sequences"
+        / sequence
+        / "velodyne"
+    )
+    poses_dir = root / "data_odometry_poses" / "dataset" / "poses"
+    calib_sequence_dir.mkdir(parents=True)
+    velodyne_dir.mkdir(parents=True)
+    poses_dir.mkdir(parents=True)
+
+    (calib_sequence_dir / "calib.txt").write_text(
+        "Tr: 1 0 0 1 0 1 0 2 0 0 1 3\n",
+        encoding="utf-8",
+    )
+    (calib_sequence_dir / "times.txt").write_text(
+        "\n".join(f"{index * 0.1:.1f}" for index in range(frame_count)),
+        encoding="utf-8",
+    )
+    (poses_dir / f"{sequence}.txt").write_text(
+        "\n".join("1 0 0 0 0 1 0 0 0 0 1 0" for _ in range(frame_count)),
+        encoding="utf-8",
+    )
+
+    for index in range(frame_count):
+        points = np.array(
+            [
+                [index + 1.0, 0.0, 0.5, 0.1],
+                [index + 2.0, 1.0, 0.6, 0.2],
+            ],
+            dtype=np.float32,
+        )
+        points.tofile(velodyne_dir / f"{index:06d}.bin")
+
+
 def test_build_sequence_paths_uses_expected_kitti_layout(tmp_path) -> None:
-    """路径构建应匹配 KITTI Odometry 目录结构。"""
+    """路径构建应匹配 KITTI Odometry 合并目录结构。"""
 
     paths = build_sequence_paths(tmp_path, "00")
 
+    assert paths.layout == "merged"
     assert paths.sequence_dir == tmp_path / "sequences" / "00"
     assert paths.velodyne_dir == tmp_path / "sequences" / "00" / "velodyne"
     assert paths.calib_path == tmp_path / "sequences" / "00" / "calib.txt"
@@ -61,8 +103,31 @@ def test_build_sequence_paths_uses_expected_kitti_layout(tmp_path) -> None:
     assert paths.pose_path == tmp_path / "poses" / "00.txt"
 
 
+def test_build_sequence_paths_supports_split_kitti_layout(tmp_path) -> None:
+    """官方三个 zip 分开解压时，也应能虚拟拼成同一个 KITTI 序列。"""
+
+    _write_fake_split_kitti_sequence(tmp_path, frame_count=2)
+
+    paths = build_sequence_paths(tmp_path, "00")
+    info = validate_kitti_sequence(tmp_path, "00")
+
+    assert paths.layout == "split"
+    assert paths.velodyne_dir == (
+        tmp_path / "data_odometry_velodyne" / "dataset" / "sequences" / "00" / "velodyne"
+    )
+    assert paths.calib_path == (
+        tmp_path / "data_odometry_calib" / "dataset" / "sequences" / "00" / "calib.txt"
+    )
+    assert paths.times_path == (
+        tmp_path / "data_odometry_calib" / "dataset" / "sequences" / "00" / "times.txt"
+    )
+    assert paths.pose_path == tmp_path / "data_odometry_poses" / "dataset" / "poses" / "00.txt"
+    assert info.layout == "split"
+    assert info.frame_count == 2
+
+
 def test_load_velodyne_frame_reads_float32_n_by_4(tmp_path) -> None:
-    """Velodyne bin 文件应读取为 float32[N, 4]。"""
+    """Velodyne bin 文件应读取为 float32[N, 4]."""
 
     frame_path = tmp_path / "000000.bin"
     expected = np.array([[1.0, 2.0, 3.0, 0.5], [4.0, 5.0, 6.0, 0.6]], dtype=np.float32)
@@ -118,6 +183,7 @@ def test_summarize_kitti_sequence_contains_preview_fields(tmp_path) -> None:
     summary = summarize_kitti_sequence(tmp_path, "00")
 
     assert summary["sequence"] == "00"
+    assert summary["layout"] == "merged"
     assert summary["frame_count"] == 2
     assert summary["pose_count"] == 2
     assert summary["timestamp_count"] == 2

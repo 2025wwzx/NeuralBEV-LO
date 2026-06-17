@@ -13,6 +13,13 @@ For each sequence used by a command, the project expects:
 - `sequences/<seq>/times.txt`
 - `poses/<seq>.txt`
 
+The loader also supports the official split download layout without moving files:
+
+- `data_odometry_velodyne/dataset/sequences/<seq>/velodyne/*.bin`
+- `data_odometry_calib/dataset/sequences/<seq>/calib.txt`
+- `data_odometry_calib/dataset/sequences/<seq>/times.txt`
+- `data_odometry_poses/dataset/poses/<seq>.txt`
+
 The implementation must validate that timestamps, poses, and Velodyne frames have consistent counts before processing.
 
 ## Point Cloud Shape

@@ -20,6 +20,16 @@ data/kitti_odometry/
     ...
 ```
 
+If you downloaded the official KITTI Odometry archives as three separate packages, the
+code also accepts this split layout:
+
+```text
+data/kitti_odometry/
+  data_odometry_calib/dataset/sequences/00/{calib.txt,times.txt}
+  data_odometry_velodyne/dataset/sequences/00/velodyne/*.bin
+  data_odometry_poses/dataset/poses/00.txt
+```
+
 You may also set `KITTI_ROOT` to point at another KITTI Odometry root. Runtime code should resolve the dataset root from `configs/dataset/kitti.yaml` or `KITTI_ROOT`, never from a hard-coded absolute path.
 
 Do not commit:
