@@ -332,6 +332,7 @@ commands:
   python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week12_m3_freeze --metrics-dir outputs/metrics/week12_m3_freeze
   python scripts/build_m3_demo_video.py --memory-image outputs/figures/week12_m3_freeze/07_000000_000004_memory.png --trajectory-image outputs/figures/week12_m3_freeze/07_000000_000004_trajectory.png --output outputs/figures/week12_m3_freeze/neuralbev_lo_v0_1_demo.mp4 --seconds 6 --fps 6 --title "NeuralBEV-LO v0.1 research prototype"
   python scripts/write_v0_1_report.py
+  python scripts/write_release_manifest.py
   python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
   python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
   python scripts/check_release_readiness.py --allow-pending-tag
@@ -345,6 +346,7 @@ result:
   KITTI M3 freeze wrote memory metrics, consistency metrics, figures, and v0.1 demo video.
   v0.1 demo video exists with 36 frames at 6 FPS.
   v0.1 final report writes config, device, checkpoint, metrics, limitations, and artifact paths.
+  v0.1 release manifest records commit, branch, artifact SHA256 values, and metrics summaries.
   Artifact-aware release readiness verifies the one-command release demo outputs before tagging.
   Clean-git release readiness verifies a clean worktree and synchronized upstream before tagging.
   Release readiness passed all static checks except release_tag, which is intentionally pending until user approval.
@@ -354,6 +356,7 @@ metrics:
 artifacts:
   outputs/figures/v0_1_release_demo/neuralbev_lo_v0_1_release_demo.mp4
   outputs/reports/v0_1_release_demo.txt
+  outputs/reports/v0_1_release_manifest.json
   outputs/checkpoints/week12_synthetic_freeze/posenet_3dof_latest.pt
   outputs/metrics/week12_synthetic_eval/synthetic_eval_metrics.json
   outputs/metrics/week12_synthetic_eval/synthetic_eval_metrics.csv

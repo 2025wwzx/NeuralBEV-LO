@@ -18,6 +18,7 @@ from neuralbev_lo.utils.release_demo import (  # noqa: E402
     DEFAULT_DATA_ROOT,
     DEFAULT_EVAL_CONFIG,
     DEFAULT_METRICS_DIR,
+    DEFAULT_MANIFEST_OUTPUT,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_REPORT_OUTPUT,
     DEFAULT_TRAIN_CONFIG,
@@ -42,6 +43,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
     parser.add_argument("--video-output", type=Path, default=DEFAULT_VIDEO_OUTPUT)
     parser.add_argument("--report-output", type=Path, default=DEFAULT_REPORT_OUTPUT)
+    parser.add_argument("--manifest-output", type=Path, default=DEFAULT_MANIFEST_OUTPUT)
     parser.add_argument("--video-seconds", type=float, default=6.0)
     parser.add_argument("--video-fps", type=int, default=6)
     parser.add_argument("--title", type=str, default="NeuralBEV-LO v0.1 research prototype")
@@ -66,6 +68,7 @@ def main() -> int:
         metrics_dir=args.metrics_dir,
         video_output=args.video_output,
         report_output=args.report_output,
+        manifest_output=args.manifest_output,
         cpu=not args.use_cuda,
         video_seconds=args.video_seconds,
         video_fps=args.video_fps,

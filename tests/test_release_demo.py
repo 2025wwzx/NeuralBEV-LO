@@ -23,19 +23,22 @@ def test_build_release_demo_commands_use_expected_paths() -> None:
         metrics_dir=Path("outputs/metrics/demo"),
         report_output=Path("outputs/reports/demo.txt"),
         video_output=Path("outputs/figures/demo/demo.mp4"),
+        manifest_output=Path("outputs/reports/demo_manifest.json"),
         cpu=True,
     )
 
     commands = build_release_demo_commands(config, python_executable="python")
     joined = [" ".join(command) for command in commands]
 
-    assert len(commands) == 3
+    assert len(commands) == 4
     assert commands[0][:2] == ["python", "scripts/build_bev_memory_demo.py"]
     assert "--cpu" in commands[0]
     assert "outputs/figures/demo/07_000000_000004_memory.png" in joined[1]
     assert "outputs/figures/demo/demo.mp4" in joined[1]
     assert "outputs/metrics/demo/07_000000_000004_memory_metrics.json" in joined[2]
     assert "outputs/reports/demo.txt" in joined[2]
+    assert "scripts/write_release_manifest.py" in joined[3]
+    assert "outputs/reports/demo_manifest.json" in joined[3]
 
 
 def test_release_demo_cli_dry_run_outputs_commands() -> None:
@@ -60,3 +63,4 @@ def test_release_demo_cli_dry_run_outputs_commands() -> None:
     assert "scripts/build_bev_memory_demo.py" in completed.stdout
     assert "scripts/build_m3_demo_video.py" in completed.stdout
     assert "scripts/write_v0_1_report.py" in completed.stdout
+    assert "scripts/write_release_manifest.py" in completed.stdout

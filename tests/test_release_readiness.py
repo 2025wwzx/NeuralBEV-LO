@@ -42,6 +42,7 @@ def _make_minimal_release_repo(root: Path) -> None:
                 "docs/release_notes_v0_1.md",
                 "scripts/run_v0_1_release_demo.py",
                 "scripts/write_v0_1_report.py",
+                "scripts/write_release_manifest.py",
             ]
         ),
     )
@@ -62,6 +63,7 @@ def _make_minimal_release_repo(root: Path) -> None:
         "scripts/build_m3_demo_video.py",
         "scripts/run_v0_1_release_demo.py",
         "scripts/write_v0_1_report.py",
+        "scripts/write_release_manifest.py",
         "scripts/check_release_readiness.py",
     ]:
         _write_text(root / path)
@@ -152,6 +154,60 @@ def _write_release_artifacts(root: Path) -> None:
             ]
         ),
     )
+    _write_json(
+        root / "outputs/reports/v0_1_release_manifest.json",
+        {
+            "schema_version": 1,
+            "tag_target": "v0.1-research-prototype",
+            "git": {"commit": "abc123", "branch": "test", "upstream": "", "dirty": False},
+            "metrics": {
+                "memory": {
+                    "naive": {"occupancy_iou": 0.5, "mean_abs_error": 0.1},
+                    "gt_pose": {"occupancy_iou": 1.0, "mean_abs_error": 0.0},
+                    "learned_pose": {"occupancy_iou": 0.4, "mean_abs_error": 0.2},
+                },
+                "consistency": {
+                    "naive": {"mean_alignment_iou": 0.7, "mean_flicker_score": 0.01},
+                    "gt_pose": {"mean_alignment_iou": 0.8, "mean_flicker_score": 0.02},
+                    "learned_pose": {"mean_alignment_iou": 0.6, "mean_flicker_score": 0.03},
+                },
+            },
+            "artifacts": [
+                {
+                    "path": "outputs/figures/v0_1_release_demo/07_000000_000004_memory.png",
+                    "size_bytes": 1,
+                    "sha256": "abc",
+                },
+                {
+                    "path": "outputs/figures/v0_1_release_demo/07_000000_000004_trajectory.png",
+                    "size_bytes": 1,
+                    "sha256": "def",
+                },
+                {
+                    "path": "outputs/figures/v0_1_release_demo/07_000000_000004_alignment_curve.png",
+                    "size_bytes": 1,
+                    "sha256": "ghi",
+                },
+                {
+                    "path": "outputs/figures/v0_1_release_demo/neuralbev_lo_v0_1_release_demo.mp4",
+                    "size_bytes": 1,
+                    "sha256": "jkl",
+                },
+                {
+                    "path": "outputs/metrics/v0_1_release_demo/07_000000_000004_memory_metrics.json",
+                    "size_bytes": 1,
+                    "sha256": "mno",
+                },
+                {
+                    "path": "outputs/metrics/v0_1_release_demo/07_000000_000004_consistency_metrics.json",
+                    "size_bytes": 1,
+                    "sha256": "pqr",
+                },
+                {"path": "outputs/reports/v0_1_release_demo.txt", "size_bytes": 1, "sha256": "stu"},
+            ],
+            "validation_commands": ["python -m pytest"],
+        },
+    )
 
 
 def test_release_readiness_checks_current_repo() -> None:
@@ -162,7 +218,7 @@ def test_release_readiness_checks_current_repo() -> None:
     assert result.passed, result.format_text()
     assert "required_docs" in result.checks
     assert result.checks["required_docs"].detail == "9 paths present"
-    assert result.checks["required_scripts"].detail == "9 paths present"
+    assert result.checks["required_scripts"].detail == "10 paths present"
     assert result.checks["readme_release_content"].status == "pass"
     assert result.checks["release_notes_content"].status == "pass"
     assert "runtime_artifacts_ignored" in result.checks
@@ -194,7 +250,7 @@ def test_release_readiness_checks_release_artifacts(tmp_path: Path) -> None:
 
     assert result.passed, result.format_text()
     assert result.checks["release_artifacts"].status == "pass"
-    assert "7 artifacts verified" in result.checks["release_artifacts"].detail
+    assert "8 artifacts verified" in result.checks["release_artifacts"].detail
 
 
 def test_release_readiness_cli_can_require_artifacts(tmp_path: Path) -> None:

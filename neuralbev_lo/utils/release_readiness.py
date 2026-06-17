@@ -31,6 +31,7 @@ REQUIRED_SCRIPTS: Final[tuple[str, ...]] = (
     "scripts/build_m3_demo_video.py",
     "scripts/run_v0_1_release_demo.py",
     "scripts/write_v0_1_report.py",
+    "scripts/write_release_manifest.py",
     "scripts/check_release_readiness.py",
 )
 
@@ -42,6 +43,7 @@ README_REQUIRED_PHRASES: Final[tuple[str, ...]] = (
     "docs/release_notes_v0_1.md",
     "scripts/run_v0_1_release_demo.py",
     "scripts/write_v0_1_report.py",
+    "scripts/write_release_manifest.py",
 )
 
 RELEASE_NOTES_REQUIRED_PHRASES: Final[tuple[str, ...]] = (
@@ -70,6 +72,7 @@ RELEASE_ARTIFACTS: Final[tuple[str, ...]] = (
     "outputs/metrics/v0_1_release_demo/07_000000_000004_memory_metrics.json",
     "outputs/metrics/v0_1_release_demo/07_000000_000004_consistency_metrics.json",
     "outputs/reports/v0_1_release_demo.txt",
+    "outputs/reports/v0_1_release_manifest.json",
 )
 
 RELEASE_MEMORY_METRICS: Final[str] = (
@@ -79,6 +82,7 @@ RELEASE_CONSISTENCY_METRICS: Final[str] = (
     "outputs/metrics/v0_1_release_demo/07_000000_000004_consistency_metrics.json"
 )
 RELEASE_REPORT: Final[str] = "outputs/reports/v0_1_release_demo.txt"
+RELEASE_MANIFEST: Final[str] = "outputs/reports/v0_1_release_manifest.json"
 REQUIRED_MEMORY_NAMES: Final[set[str]] = {"naive", "gt_pose", "learned_pose"}
 REQUIRED_REPORT_PHRASES: Final[tuple[str, ...]] = (
     "NeuralBEV-LO v0.1 Final Report",
@@ -298,6 +302,7 @@ def _check_release_artifacts(root: Path) -> ReadinessCheck:
         _validate_memory_metrics(root / RELEASE_MEMORY_METRICS)
         _validate_consistency_metrics(root / RELEASE_CONSISTENCY_METRICS)
         _validate_final_report(root / RELEASE_REPORT)
+        _validate_release_manifest(root / RELEASE_MANIFEST)
     except ValueError as exc:
         return ReadinessCheck(name="release_artifacts", status="fail", detail=str(exc))
     return ReadinessCheck(
@@ -406,6 +411,39 @@ def _validate_final_report(path: Path) -> None:
     missing = [phrase for phrase in REQUIRED_REPORT_PHRASES if phrase not in text]
     if missing:
         raise ValueError(f"final report missing phrases: {', '.join(missing)}")
+
+
+def _validate_release_manifest(path: Path) -> None:
+    """校验 release manifest 是否包含 tag、git、artifact 和 metrics 摘要。"""
+
+    payload = _read_json_object(path)
+    if payload.get("schema_version") != 1:
+        raise ValueError("release manifest schema_version must be 1")
+    if payload.get("tag_target") != "v0.1-research-prototype":
+        raise ValueError("release manifest tag_target must be v0.1-research-prototype")
+    git_section = _require_dict(payload.get("git"), "release manifest git")
+    _require_non_empty_text(git_section.get("commit"), "release manifest git commit")
+    artifacts = _require_list(payload.get("artifacts"), "release manifest artifacts")
+    if len(artifacts) < len(RELEASE_ARTIFACTS) - 1:
+        raise ValueError("release manifest artifacts list is incomplete")
+    for item in artifacts:
+        _require_non_empty_text(item.get("path"), "release manifest artifact path")
+        _require_non_empty_text(item.get("sha256"), "release manifest artifact sha256")
+        _require_number(item.get("size_bytes"), "release manifest artifact size_bytes")
+    metrics = _require_dict(payload.get("metrics"), "release manifest metrics")
+    memory_metrics = _require_dict(metrics.get("memory"), "release manifest memory metrics")
+    consistency_metrics = _require_dict(
+        metrics.get("consistency"),
+        "release manifest consistency metrics",
+    )
+    missing_memory = sorted(REQUIRED_MEMORY_NAMES - set(memory_metrics))
+    missing_consistency = sorted(REQUIRED_MEMORY_NAMES - set(consistency_metrics))
+    if missing_memory:
+        raise ValueError(f"release manifest memory metrics missing: {', '.join(missing_memory)}")
+    if missing_consistency:
+        raise ValueError(
+            f"release manifest consistency metrics missing: {', '.join(missing_consistency)}"
+        )
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:

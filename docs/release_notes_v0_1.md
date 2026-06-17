@@ -23,6 +23,7 @@ not production-grade odometry.
 
 ```powershell
 python scripts/run_v0_1_release_demo.py
+python scripts/write_release_manifest.py
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
 python -m pytest
@@ -37,6 +38,7 @@ Expected local release-demo outputs:
 - `outputs/metrics/v0_1_release_demo/07_000000_000004_memory_metrics.json`
 - `outputs/metrics/v0_1_release_demo/07_000000_000004_consistency_metrics.json`
 - `outputs/reports/v0_1_release_demo.txt`
+- `outputs/reports/v0_1_release_manifest.json`
 
 ## Metrics Snapshot
 

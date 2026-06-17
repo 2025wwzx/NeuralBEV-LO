@@ -22,6 +22,7 @@ DEFAULT_OUTPUT_DIR: Final[Path] = Path("outputs/figures/v0_1_release_demo")
 DEFAULT_METRICS_DIR: Final[Path] = Path("outputs/metrics/v0_1_release_demo")
 DEFAULT_VIDEO_OUTPUT: Final[Path] = DEFAULT_OUTPUT_DIR / "neuralbev_lo_v0_1_release_demo.mp4"
 DEFAULT_REPORT_OUTPUT: Final[Path] = Path("outputs/reports/v0_1_release_demo.txt")
+DEFAULT_MANIFEST_OUTPUT: Final[Path] = Path("outputs/reports/v0_1_release_manifest.json")
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class ReleaseDemoConfig:
     metrics_dir: Path = DEFAULT_METRICS_DIR
     video_output: Path = DEFAULT_VIDEO_OUTPUT
     report_output: Path = DEFAULT_REPORT_OUTPUT
+    manifest_output: Path = DEFAULT_MANIFEST_OUTPUT
     cpu: bool = True
     video_seconds: float = 6.0
     video_fps: int = 6
@@ -95,7 +97,7 @@ class ReleaseDemoConfig:
 
     @property
     def report_artifacts(self) -> list[Path]:
-        """返回 final report 中应列出的 artifact 路径。"""
+        """返回 final report 和 manifest 中应列出的 artifact 路径。"""
 
         return [
             self.memory_image,
@@ -181,7 +183,20 @@ def build_release_demo_commands(
     for artifact_path in config.report_artifacts:
         report_command.extend(["--artifact", _path_text(artifact_path)])
 
-    return [bev_command, video_command, report_command]
+    manifest_command = [
+        python_text,
+        "scripts/write_release_manifest.py",
+        "--memory-metrics",
+        _path_text(config.memory_metrics),
+        "--consistency-metrics",
+        _path_text(config.consistency_metrics),
+        "--output",
+        _path_text(config.manifest_output),
+    ]
+    for artifact_path in [*config.report_artifacts, config.report_output]:
+        manifest_command.extend(["--artifact", _path_text(artifact_path)])
+
+    return [bev_command, video_command, report_command, manifest_command]
 
 
 def run_release_demo(
