@@ -161,3 +161,53 @@ notes:
   Suspected cause: the checkpoint is smoke-scale and was not trained long enough to produce useful odometry.
   Full training or a stronger overfit checkpoint is needed before claiming learned-pose BEV quality.
 ```
+
+## 2026-06-17 Week 9 BEV Consistency Metrics and Resolution Ablation
+
+```text
+date: 2026-06-17
+run_id: week9_bev_consistency_kitti_tiny
+config: configs/eval/kitti_eval.yaml
+train_config: configs/train/posenet_3dof.yaml
+dataset: KITTI Odometry sequence 07, first 5 frames
+checkpoint: outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt
+metrics_definition:
+  alignment_iou: mean IoU between thresholded current BEV and thresholded memory BEV.
+  flicker_score: mean pixel-wise standard deviation over the memory history window.
+  occupancy_threshold: 0.1
+  selected_channels: density
+  flicker_window: 5
+commands:
+  python -m pytest tests/test_bev_consistency_metrics.py
+  python -m pytest tests/test_learned_bev_memory.py tests/test_bev_consistency_metrics.py
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --resolution-m 0.5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week9_kitti_tiny_consistency_05 --metrics-dir outputs/metrics/week9_kitti_tiny_consistency_05
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --resolution-m 0.25 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week9_kitti_tiny_consistency_025 --metrics-dir outputs/metrics/week9_kitti_tiny_consistency_025
+result:
+  Week 9 tests passed: 4 passed in tests/test_bev_consistency_metrics.py.
+  Week 8 + Week 9 local tests passed: 8 passed.
+  0.5m final memory occupancy_iou: naive 0.689449, gt_pose 1.0, learned_pose 0.541895.
+  0.5m mean per-frame consistency: naive alignment 0.743782 / flicker 0.002002; gt_pose alignment 0.791565 / flicker 0.008974; learned_pose alignment 0.612429 / flicker 0.026496.
+  0.25m final memory occupancy_iou: naive 0.541576, gt_pose 1.0, learned_pose 0.470163.
+  0.25m mean per-frame consistency: naive alignment 0.651811 / flicker 0.001256; gt_pose alignment 0.732911 / flicker 0.006948; learned_pose alignment 0.507377 / flicker 0.016087.
+artifacts:
+  outputs/figures/week9_kitti_tiny_consistency_05/07_000000_000004_memory.png
+  outputs/figures/week9_kitti_tiny_consistency_05/07_000000_000004_trajectory.png
+  outputs/figures/week9_kitti_tiny_consistency_05/07_000000_000004_alignment_curve.png
+  outputs/metrics/week9_kitti_tiny_consistency_05/07_000000_000004_memory_metrics.json
+  outputs/metrics/week9_kitti_tiny_consistency_05/07_000000_000004_memory_metrics.csv
+  outputs/metrics/week9_kitti_tiny_consistency_05/07_000000_000004_consistency_metrics.json
+  outputs/metrics/week9_kitti_tiny_consistency_05/07_000000_000004_consistency_metrics.csv
+  outputs/figures/week9_kitti_tiny_consistency_025/07_000000_000004_memory.png
+  outputs/figures/week9_kitti_tiny_consistency_025/07_000000_000004_trajectory.png
+  outputs/figures/week9_kitti_tiny_consistency_025/07_000000_000004_alignment_curve.png
+  outputs/metrics/week9_kitti_tiny_consistency_025/07_000000_000004_memory_metrics.json
+  outputs/metrics/week9_kitti_tiny_consistency_025/07_000000_000004_memory_metrics.csv
+  outputs/metrics/week9_kitti_tiny_consistency_025/07_000000_000004_consistency_metrics.json
+  outputs/metrics/week9_kitti_tiny_consistency_025/07_000000_000004_consistency_metrics.csv
+notes:
+  These metrics are short-sequence engineering indicators, not proof of global map correctness.
+  alignment_iou currently uses density only; the same threshold is not valid for height channels without redefining the metric.
+  flicker_score is affected by memory decay alpha 0.9 and flicker_window 5, so lower flicker can also mean heavier smoothing.
+  The learned checkpoint remains smoke-scale and is still worse than naive memory in both tested resolutions.
+  Resolution ablation changes rasterizer resolution only; the PoseNet checkpoint is not retrained per resolution.
+```

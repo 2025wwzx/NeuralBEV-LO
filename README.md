@@ -115,6 +115,25 @@ python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --
 The current smoke checkpoint is weak; the expected Week 8 result is a runnable
 comparison plus a documented failure case, not a strong learned map yet.
 
+## Week 9 BEV Consistency Metric Commands
+
+Week 9 adds per-frame BEV consistency metrics to the memory demo. The command
+now writes final memory metrics JSON/CSV, per-frame consistency JSON/CSV, and an
+alignment curve PNG. Use `--resolution-m` to run a small resolution ablation
+without editing YAML.
+
+```powershell
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --resolution-m 0.5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week9_kitti_tiny_consistency_05 --metrics-dir outputs/metrics/week9_kitti_tiny_consistency_05
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --resolution-m 0.25 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week9_kitti_tiny_consistency_025 --metrics-dir outputs/metrics/week9_kitti_tiny_consistency_025
+```
+
+Metric definitions are stored in the consistency JSON metadata. The current
+defaults use density only: `alignment_iou` is thresholded current BEV vs memory
+BEV mean IoU with `occupancy_threshold=0.1`, and `flicker_score` is mean
+pixel-wise standard deviation over the configured memory window. These are
+short-sequence engineering indicators; they do not prove global map correctness,
+height consistency, or learned odometry quality.
+
 ## Data
 
 Large datasets are not committed. See `data/README.md` for the expected KITTI layout and environment-variable options.

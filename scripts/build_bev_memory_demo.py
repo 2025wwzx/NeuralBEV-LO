@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Final
 
@@ -24,7 +25,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from neuralbev_lo.bev.memory import BevMemoryConfig, initialize_memory, update_memory  # noqa: E402
-from neuralbev_lo.bev.rasterizer import BevGridConfig, bev_config_from_mapping, rasterize_point_cloud  # noqa: E402
+from neuralbev_lo.bev.rasterizer import (  # noqa: E402
+    BevGridConfig,
+    bev_config_from_mapping,
+    rasterize_point_cloud,
+)
 from neuralbev_lo.data.kitti_dataset import (  # noqa: E402
     build_sequence_paths,
     list_velodyne_files,
@@ -37,7 +42,12 @@ from neuralbev_lo.data.pose_utils import (  # noqa: E402
     parse_calibration_file,
     relative_transform,
 )
-from neuralbev_lo.eval.bev_metrics import memory_quality_table, save_memory_metrics_json  # noqa: E402
+from neuralbev_lo.eval.bev_metrics import (  # noqa: E402
+    bev_consistency_table,
+    memory_quality_table,
+    save_memory_metrics_csv,
+    save_memory_metrics_json,
+)
 from neuralbev_lo.eval.odometry_metrics import integrate_relative_poses  # noqa: E402
 from neuralbev_lo.geometry.se2 import se2_from_xyyaw  # noqa: E402
 from neuralbev_lo.models.losses import denormalize_pose_batch  # noqa: E402
@@ -46,6 +56,7 @@ from neuralbev_lo.training.checkpoint import load_checkpoint  # noqa: E402
 from neuralbev_lo.utils.config import load_yaml_config  # noqa: E402
 from neuralbev_lo.utils.logging import log_info, log_warn  # noqa: E402
 from neuralbev_lo.viz.render_bev import save_bev_comparison  # noqa: E402
+from neuralbev_lo.viz.render_metrics import save_metric_curve  # noqa: E402
 from neuralbev_lo.viz.render_trajectory import save_trajectory_overlay  # noqa: E402
 
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "configs" / "eval" / "kitti_eval.yaml"
@@ -68,6 +79,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
     parser.add_argument("--pose-source", choices=("gt", "learned"), default="gt")
     parser.add_argument("--checkpoint", type=Path, default=None)
+    parser.add_argument("--resolution-m", type=float, default=None)
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--cpu", action="store_true")
     return parser.parse_args()
@@ -91,7 +103,9 @@ def _resolve_data_root(config: dict[str, Any], override: Path | None) -> Path:
 def _load_bev_config(eval_config: dict[str, Any], train_config_path: Path) -> BevGridConfig:
     """从训练配置读取 BEV grid，保持 Week 3/4/8 的 BEV 定义一致。"""
 
-    configured = PROJECT_ROOT / str(eval_config.get("data", {}).get("train_config", train_config_path))
+    configured = PROJECT_ROOT / str(
+        eval_config.get("data", {}).get("train_config", train_config_path)
+    )
     if configured.exists():
         train_config = load_yaml_config(configured)
     elif train_config_path.exists():
@@ -117,6 +131,32 @@ def _load_runtime_bev_config(
     return _load_bev_config(eval_config, train_config_path)
 
 
+def _resolve_selected_channel_indices(
+    metrics_config: dict[str, Any],
+    bev_config: BevGridConfig,
+) -> tuple[list[str], tuple[int, ...]]:
+    """把 metrics 配置中的通道名解析为 BEV 通道索引。"""
+
+    raw_channels = metrics_config.get("selected_channels", ["density"])
+    if not isinstance(raw_channels, list | tuple) or not raw_channels:
+        raise ValueError("metrics.selected_channels must be a non-empty list")
+    selected_channels = [str(channel) for channel in raw_channels]
+    indices: list[int] = []
+    for channel_name in selected_channels:
+        if channel_name not in bev_config.channels:
+            raise ValueError(
+                f"selected channel {channel_name} is not in BEV channels {bev_config.channels}"
+            )
+        indices.append(bev_config.channels.index(channel_name))
+    return selected_channels, tuple(indices)
+
+
+def _tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
+    """把 BEV tensor 复制为 numpy，避免后续 inplace 或引用共享影响历史指标。"""
+
+    return tensor.detach().cpu().numpy().copy()
+
+
 def _load_lidar_poses(paths) -> np.ndarray:
     """读取 KITTI camera pose 并转换为内部 `T_world_lidar`。"""
 
@@ -129,7 +169,10 @@ def _load_lidar_poses(paths) -> np.ndarray:
     )
 
 
-def _synthetic_bev_sequence(frames: int, config: BevGridConfig) -> tuple[list[np.ndarray], np.ndarray, str]:
+def _synthetic_bev_sequence(
+    frames: int,
+    config: BevGridConfig,
+) -> tuple[list[np.ndarray], np.ndarray, str]:
     """构造合成 BEV 序列和 GT relative poses。"""
 
     if frames < 2:
@@ -171,7 +214,13 @@ def _kitti_bev_sequence(
     relatives = []
     for frame_index in range(start_frame + 1, end_frame):
         transform = relative_transform(lidar_poses[frame_index - 1], lidar_poses[frame_index])
-        relatives.append([float(transform[0, 3]), float(transform[1, 3]), float(np.arctan2(transform[1, 0], transform[0, 0]))])
+        relatives.append(
+            [
+                float(transform[0, 3]),
+                float(transform[1, 3]),
+                float(np.arctan2(transform[1, 0], transform[0, 0])),
+            ]
+        )
     return bevs, np.asarray(relatives, dtype=np.float64), paths.sequence
 
 
@@ -196,7 +245,11 @@ def _predict_learned_relative(
     if isinstance(checkpoint_config, dict) and checkpoint_config.get("pose"):
         checkpoint_pose_norm = checkpoint_config.get("pose", {}).get("pose_norm", {})
     pose_norm = checkpoint_pose_norm or train_config.get("pose", {}).get("pose_norm", {})
-    mean = torch.as_tensor(pose_norm.get("mean", [0.0, 0.0, 0.0]), dtype=torch.float32, device=device)
+    mean = torch.as_tensor(
+        pose_norm.get("mean", [0.0, 0.0, 0.0]),
+        dtype=torch.float32,
+        device=device,
+    )
     std = torch.as_tensor(pose_norm.get("std", [1.0, 1.0, 1.0]), dtype=torch.float32, device=device)
     model.eval()
     predictions: list[np.ndarray] = []
@@ -228,17 +281,32 @@ def _update_memories(
     *,
     bev_config: BevGridConfig,
     memory_config: BevMemoryConfig,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, dict[str, list[np.ndarray]]]:
     """更新 naive / GT / learned 三种 memory。"""
 
     naive_memory = torch.as_tensor(bevs[0], dtype=torch.float32)
     gt_memory = initialize_memory(bevs[0])
     learned_memory = initialize_memory(bevs[0]) if learned_relative is not None else None
+    memory_histories: dict[str, list[np.ndarray]] = {
+        "naive": [_tensor_to_numpy(naive_memory)],
+        "gt_pose": [_tensor_to_numpy(gt_memory)],
+    }
+    if learned_memory is not None:
+        memory_histories["learned_pose"] = [_tensor_to_numpy(learned_memory)]
     for pair_index, current_bev in enumerate(bevs[1:]):
         current_tensor = torch.as_tensor(current_bev, dtype=torch.float32)
         gt_transform = se2_from_xyyaw(*gt_relative[pair_index].tolist())
-        gt_memory = update_memory(gt_memory, current_tensor, gt_transform, bev_config, memory_config)
-        naive_memory = memory_config.alpha * naive_memory + (1.0 - memory_config.alpha) * current_tensor
+        gt_memory = update_memory(
+            gt_memory,
+            current_tensor,
+            gt_transform,
+            bev_config,
+            memory_config,
+        )
+        naive_memory = (
+            memory_config.alpha * naive_memory
+            + (1.0 - memory_config.alpha) * current_tensor
+        )
         if learned_memory is not None and learned_relative is not None:
             learned_transform = se2_from_xyyaw(*learned_relative[pair_index].tolist())
             learned_memory = update_memory(
@@ -248,7 +316,11 @@ def _update_memories(
                 bev_config,
                 memory_config,
             )
-    return naive_memory, gt_memory, learned_memory
+        memory_histories["naive"].append(_tensor_to_numpy(naive_memory))
+        memory_histories["gt_pose"].append(_tensor_to_numpy(gt_memory))
+        if learned_memory is not None:
+            memory_histories["learned_pose"].append(_tensor_to_numpy(learned_memory))
+    return naive_memory, gt_memory, learned_memory, memory_histories
 
 
 def main() -> int:
@@ -264,6 +336,9 @@ def main() -> int:
     if args.pose_source == "learned" and args.checkpoint is None:
         log_warn("checkpoint is required for learned pose memory")
         return 1
+    if args.resolution_m is not None and args.resolution_m <= 0:
+        log_warn("resolution-m must be positive", resolution_m=args.resolution_m)
+        return 1
 
     try:
         eval_config = load_yaml_config(args.config)
@@ -274,10 +349,21 @@ def main() -> int:
             checkpoint_path=args.checkpoint,
             synthetic=args.synthetic,
         )
+        if args.resolution_m is not None:
+            bev_config = replace(bev_config, resolution_m=float(args.resolution_m))
         memory_section = eval_config.get("bev_memory", {})
+        metrics_section = eval_config.get("metrics", {})
         memory_config = BevMemoryConfig(
             policy=str(memory_section.get("policy", "decay")),
             alpha=float(memory_section.get("alpha", 0.9)),
+        )
+        occupancy_threshold = float(metrics_section.get("occupancy_threshold", 0.1))
+        flicker_window = int(
+            metrics_section.get("flicker_window", memory_section.get("temporal_window", 5))
+        )
+        selected_channels, channel_indices = _resolve_selected_channel_indices(
+            metrics_section,
+            bev_config,
         )
         if args.synthetic:
             bevs, gt_relative, sequence = _synthetic_bev_sequence(args.frames, bev_config)
@@ -304,7 +390,7 @@ def main() -> int:
                 bevs,
                 device=device,
             )
-        naive_memory, gt_memory, learned_memory = _update_memories(
+        naive_memory, gt_memory, learned_memory, memory_histories = _update_memories(
             bevs,
             gt_relative,
             learned_relative,
@@ -335,12 +421,16 @@ def main() -> int:
         image_path = args.output_dir / f"{prefix}_memory.png"
         trajectory_path = args.output_dir / f"{prefix}_trajectory.png"
         metrics_path = args.metrics_dir / f"{prefix}_memory_metrics.json"
+        metrics_csv_path = args.metrics_dir / f"{prefix}_memory_metrics.csv"
+        consistency_metrics_path = args.metrics_dir / f"{prefix}_consistency_metrics.json"
+        consistency_csv_path = args.metrics_dir / f"{prefix}_consistency_metrics.csv"
+        alignment_curve_path = args.output_dir / f"{prefix}_alignment_curve.png"
         save_bev_comparison(panels, image_path)
         save_trajectory_overlay(trajectories, trajectory_path, title=f"BEV memory {sequence}")
         metrics_rows = memory_quality_table(
             reference_memory=gt_memory.detach().cpu().numpy(),
             candidates=candidates,
-            occupancy_threshold=float(eval_config.get("metrics", {}).get("occupancy_threshold", 0.1)),
+            occupancy_threshold=occupancy_threshold,
         )
         save_memory_metrics_json(
             metrics_rows,
@@ -354,10 +444,55 @@ def main() -> int:
                 "checkpoint": str(args.checkpoint) if args.checkpoint else None,
                 "memory_policy": memory_config.policy,
                 "alpha": memory_config.alpha,
+                "resolution_m": bev_config.resolution_m,
             },
         )
+        save_memory_metrics_csv(metrics_rows, metrics_csv_path)
+        consistency_rows = bev_consistency_table(
+            current_bevs=bevs,
+            memory_histories=memory_histories,
+            occupancy_threshold=occupancy_threshold,
+            channel_indices=channel_indices,
+            flicker_window=flicker_window,
+        )
+        consistency_metadata = {
+            "sequence": sequence,
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "frames": len(bevs),
+            "pose_source": args.pose_source,
+            "checkpoint": str(args.checkpoint) if args.checkpoint else None,
+            "memory_policy": memory_config.policy,
+            "alpha": memory_config.alpha,
+            "resolution_m": bev_config.resolution_m,
+            "metrics_definition": {
+                "alignment_score": "mean_iou(thresholded_current_bev, thresholded_memory_bev)",
+                "flicker_score": "mean(pixel_std(memory_window, dim=time))",
+                "occupancy_threshold": occupancy_threshold,
+                "selected_channels": selected_channels,
+                "selected_channel_indices": list(channel_indices),
+                "flicker_window": flicker_window,
+            },
+        }
+        save_memory_metrics_json(
+            consistency_rows,
+            consistency_metrics_path,
+            metadata=consistency_metadata,
+        )
+        save_memory_metrics_csv(consistency_rows, consistency_csv_path)
+        save_metric_curve(
+            consistency_rows,
+            alignment_curve_path,
+            metric_name="alignment_iou",
+            title=f"BEV alignment IoU {sequence}",
+        )
     except Exception as exc:  # noqa: BLE001 - CLI 需要上下文后返回非零。
-        log_warn("BEV memory demo failed", sequence=args.sequence, pose_source=args.pose_source, error=exc)
+        log_warn(
+            "BEV memory demo failed",
+            sequence=args.sequence,
+            pose_source=args.pose_source,
+            error=exc,
+        )
         return 1
 
     log_info(
@@ -370,6 +505,10 @@ def main() -> int:
         image=image_path,
         trajectory=trajectory_path,
         metrics=metrics_path,
+        metrics_csv=metrics_csv_path,
+        consistency_metrics=consistency_metrics_path,
+        consistency_csv=consistency_csv_path,
+        alignment_curve=alignment_curve_path,
     )
     return 0
 
