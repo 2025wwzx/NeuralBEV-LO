@@ -26,6 +26,7 @@ python scripts/run_v0_1_release_demo.py
 python scripts/write_release_manifest.py
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
+python scripts/verify_v0_1_release.py
 python -m pytest
 ```
 

@@ -12,6 +12,7 @@ not claim production odometry accuracy.
 - [x] KITTI GT-pose memory path is documented.
 - [x] KITTI learned-pose M3 demo path is documented.
 - [x] One-command v0.1 release demo wrapper is documented.
+- [x] One-command v0.1 pre-tag verifier is documented.
 - [x] M3 demo video command is documented.
 - [x] v0.1 final report command is documented.
 - [x] v0.1 release manifest command is documented.
@@ -32,6 +33,7 @@ One-command release demo:
 
 ```powershell
 python scripts/run_v0_1_release_demo.py
+python scripts/verify_v0_1_release.py
 ```
 
 Expanded command sequence:
@@ -48,6 +50,7 @@ python scripts/write_v0_1_report.py
 python scripts/write_release_manifest.py
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
+python scripts/verify_v0_1_release.py
 python scripts/check_release_readiness.py --allow-pending-tag
 ```
 

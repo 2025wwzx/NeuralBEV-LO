@@ -205,6 +205,7 @@ One-command KITTI release demo:
 
 ```powershell
 python scripts/run_v0_1_release_demo.py
+python scripts/verify_v0_1_release.py
 ```
 
 This command builds learned-pose BEV memory on KITTI sequence 07, saves metrics
@@ -224,6 +225,7 @@ python scripts/write_v0_1_report.py
 python scripts/write_release_manifest.py
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
+python scripts/verify_v0_1_release.py
 python scripts/check_release_readiness.py --allow-pending-tag
 ```
 

@@ -30,6 +30,7 @@ REQUIRED_SCRIPTS: Final[tuple[str, ...]] = (
     "scripts/build_bev_memory_demo.py",
     "scripts/build_m3_demo_video.py",
     "scripts/run_v0_1_release_demo.py",
+    "scripts/verify_v0_1_release.py",
     "scripts/write_v0_1_report.py",
     "scripts/write_release_manifest.py",
     "scripts/check_release_readiness.py",
@@ -42,6 +43,7 @@ README_REQUIRED_PHRASES: Final[tuple[str, ...]] = (
     "docs/release_checklist.md",
     "docs/release_notes_v0_1.md",
     "scripts/run_v0_1_release_demo.py",
+    "scripts/verify_v0_1_release.py",
     "scripts/write_v0_1_report.py",
     "scripts/write_release_manifest.py",
 )

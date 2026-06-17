@@ -335,6 +335,7 @@ commands:
   python scripts/write_release_manifest.py
   python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
   python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
+  python scripts/verify_v0_1_release.py
   python scripts/check_release_readiness.py --allow-pending-tag
 result:
   One-command v0.1 release demo wrapper now runs BEV memory, video, and final report generation.
@@ -347,6 +348,7 @@ result:
   v0.1 demo video exists with 36 frames at 6 FPS.
   v0.1 final report writes config, device, checkpoint, metrics, limitations, and artifact paths.
   v0.1 release manifest records commit, branch, artifact SHA256 values, and metrics summaries.
+  v0.1 pre-tag verifier now runs release demo, pytest, and strict readiness from one command.
   Artifact-aware release readiness verifies the one-command release demo outputs before tagging.
   Clean-git release readiness verifies a clean worktree and synchronized upstream before tagging.
   Release readiness passed all static checks except release_tag, which is intentionally pending until user approval.

@@ -41,6 +41,7 @@ def _make_minimal_release_repo(root: Path) -> None:
                 "docs/release_checklist.md",
                 "docs/release_notes_v0_1.md",
                 "scripts/run_v0_1_release_demo.py",
+                "scripts/verify_v0_1_release.py",
                 "scripts/write_v0_1_report.py",
                 "scripts/write_release_manifest.py",
             ]
@@ -62,6 +63,7 @@ def _make_minimal_release_repo(root: Path) -> None:
         "scripts/build_bev_memory_demo.py",
         "scripts/build_m3_demo_video.py",
         "scripts/run_v0_1_release_demo.py",
+        "scripts/verify_v0_1_release.py",
         "scripts/write_v0_1_report.py",
         "scripts/write_release_manifest.py",
         "scripts/check_release_readiness.py",
@@ -218,7 +220,7 @@ def test_release_readiness_checks_current_repo() -> None:
     assert result.passed, result.format_text()
     assert "required_docs" in result.checks
     assert result.checks["required_docs"].detail == "9 paths present"
-    assert result.checks["required_scripts"].detail == "10 paths present"
+    assert result.checks["required_scripts"].detail == "11 paths present"
     assert result.checks["readme_release_content"].status == "pass"
     assert result.checks["release_notes_content"].status == "pass"
     assert "runtime_artifacts_ignored" in result.checks
