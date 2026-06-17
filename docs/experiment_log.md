@@ -332,6 +332,7 @@ commands:
   python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week12_m3_freeze --metrics-dir outputs/metrics/week12_m3_freeze
   python scripts/build_m3_demo_video.py --memory-image outputs/figures/week12_m3_freeze/07_000000_000004_memory.png --trajectory-image outputs/figures/week12_m3_freeze/07_000000_000004_trajectory.png --output outputs/figures/week12_m3_freeze/neuralbev_lo_v0_1_demo.mp4 --seconds 6 --fps 6 --title "NeuralBEV-LO v0.1 research prototype"
   python scripts/write_v0_1_report.py
+  python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
   python scripts/check_release_readiness.py --allow-pending-tag
 result:
   One-command v0.1 release demo wrapper now runs BEV memory, video, and final report generation.
@@ -343,6 +344,7 @@ result:
   KITTI M3 freeze wrote memory metrics, consistency metrics, figures, and v0.1 demo video.
   v0.1 demo video exists with 36 frames at 6 FPS.
   v0.1 final report writes config, device, checkpoint, metrics, limitations, and artifact paths.
+  Artifact-aware release readiness verifies the one-command release demo outputs before tagging.
   Release readiness passed all static checks except release_tag, which is intentionally pending until user approval.
 metrics:
   final occupancy_iou: naive 0.689678, gt_pose 1.0, learned_pose 0.542051.

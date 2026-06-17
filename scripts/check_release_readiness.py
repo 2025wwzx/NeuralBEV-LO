@@ -27,6 +27,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Allow the release tag check to remain pending until user approval.",
     )
+    parser.add_argument(
+        "--require-artifacts",
+        action="store_true",
+        help="Require local v0.1 release demo artifacts to exist and be readable.",
+    )
     return parser.parse_args()
 
 
@@ -34,7 +39,7 @@ def main() -> int:
     """运行 release readiness 检查。"""
 
     args = _parse_args()
-    result = collect_release_readiness(args.repo_root)
+    result = collect_release_readiness(args.repo_root, require_artifacts=args.require_artifacts)
     print(result.format_text())
     failing = [
         check

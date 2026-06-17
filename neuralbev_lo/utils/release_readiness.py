@@ -4,10 +4,11 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 REQUIRED_DOCS: Final[tuple[str, ...]] = (
     "README.md",
@@ -51,6 +52,34 @@ ALLOWED_TRACKED_RUNTIME_DOCS: Final[set[str]] = {
     "data/README.md",
 }
 
+RELEASE_ARTIFACTS: Final[tuple[str, ...]] = (
+    "outputs/figures/v0_1_release_demo/07_000000_000004_memory.png",
+    "outputs/figures/v0_1_release_demo/07_000000_000004_trajectory.png",
+    "outputs/figures/v0_1_release_demo/07_000000_000004_alignment_curve.png",
+    "outputs/figures/v0_1_release_demo/neuralbev_lo_v0_1_release_demo.mp4",
+    "outputs/metrics/v0_1_release_demo/07_000000_000004_memory_metrics.json",
+    "outputs/metrics/v0_1_release_demo/07_000000_000004_consistency_metrics.json",
+    "outputs/reports/v0_1_release_demo.txt",
+)
+
+RELEASE_MEMORY_METRICS: Final[str] = (
+    "outputs/metrics/v0_1_release_demo/07_000000_000004_memory_metrics.json"
+)
+RELEASE_CONSISTENCY_METRICS: Final[str] = (
+    "outputs/metrics/v0_1_release_demo/07_000000_000004_consistency_metrics.json"
+)
+RELEASE_REPORT: Final[str] = "outputs/reports/v0_1_release_demo.txt"
+REQUIRED_MEMORY_NAMES: Final[set[str]] = {"naive", "gt_pose", "learned_pose"}
+REQUIRED_REPORT_PHRASES: Final[tuple[str, ...]] = (
+    "NeuralBEV-LO v0.1 Final Report",
+    "config:",
+    "device:",
+    "checkpoint:",
+    "Memory Metrics",
+    "Artifacts",
+    "Limitations",
+)
+
 
 @dataclass(frozen=True)
 class ReadinessCheck:
@@ -89,7 +118,11 @@ class ReadinessResult:
         return "\n".join(lines)
 
 
-def collect_release_readiness(repo_root: str | Path) -> ReadinessResult:
+def collect_release_readiness(
+    repo_root: str | Path,
+    *,
+    require_artifacts: bool = False,
+) -> ReadinessResult:
     """收集当前仓库的 v0.1 release readiness 静态检查。
 
     参数:
@@ -107,6 +140,8 @@ def collect_release_readiness(repo_root: str | Path) -> ReadinessResult:
         "no_tracked_runtime_artifacts": _check_no_tracked_runtime_artifacts(root),
         "release_tag": _check_release_tag(root),
     }
+    if require_artifacts:
+        checks["release_artifacts"] = _check_release_artifacts(root)
     return ReadinessResult(checks=checks)
 
 
@@ -205,6 +240,141 @@ def _check_release_tag(root: Path) -> ReadinessCheck:
         status="pending",
         detail=f"{tag_name} requires explicit user approval before creation",
     )
+
+
+def _check_release_artifacts(root: Path) -> ReadinessCheck:
+    """检查 v0.1 release demo 运行产物是否存在且内容可读。"""
+
+    missing = [path for path in RELEASE_ARTIFACTS if not (root / path).exists()]
+    if missing:
+        return ReadinessCheck(
+            name="release_artifacts",
+            status="fail",
+            detail=f"missing artifacts: {', '.join(missing)}",
+        )
+    empty = [path for path in RELEASE_ARTIFACTS if (root / path).stat().st_size <= 0]
+    if empty:
+        return ReadinessCheck(
+            name="release_artifacts",
+            status="fail",
+            detail=f"empty artifacts: {', '.join(empty)}",
+        )
+    try:
+        _validate_memory_metrics(root / RELEASE_MEMORY_METRICS)
+        _validate_consistency_metrics(root / RELEASE_CONSISTENCY_METRICS)
+        _validate_final_report(root / RELEASE_REPORT)
+    except ValueError as exc:
+        return ReadinessCheck(name="release_artifacts", status="fail", detail=str(exc))
+    return ReadinessCheck(
+        name="release_artifacts",
+        status="pass",
+        detail=f"{len(RELEASE_ARTIFACTS)} artifacts verified",
+    )
+
+
+def _validate_memory_metrics(path: Path) -> None:
+    """校验 release memory metrics JSON 的关键字段。"""
+
+    payload = _read_json_object(path)
+    metadata = _require_dict(payload.get("metadata"), "memory metrics metadata")
+    metrics = _require_list(payload.get("metrics"), "memory metrics")
+    if str(metadata.get("sequence")) != "07":
+        raise ValueError("memory metrics sequence must be 07")
+    if int(metadata.get("frames", 0)) < 5:
+        raise ValueError("memory metrics frames must be at least 5")
+    _require_non_empty_text(metadata.get("device"), "memory metrics device")
+    _require_non_empty_text(metadata.get("checkpoint"), "memory metrics checkpoint")
+    names = _metric_memory_names(metrics)
+    missing_names = sorted(REQUIRED_MEMORY_NAMES - names)
+    if missing_names:
+        raise ValueError(f"memory metrics missing memories: {', '.join(missing_names)}")
+    for item in metrics:
+        memory_name = _require_non_empty_text(item.get("memory"), "memory")
+        _require_number(item.get("occupancy_iou"), f"{memory_name}.occupancy_iou")
+        _require_number(item.get("mean_abs_error"), f"{memory_name}.mean_abs_error")
+
+
+def _validate_consistency_metrics(path: Path) -> None:
+    """校验 release consistency metrics JSON 的关键字段。"""
+
+    payload = _read_json_object(path)
+    metrics = _require_list(payload.get("metrics"), "consistency metrics")
+    names = _metric_memory_names(metrics)
+    missing_names = sorted(REQUIRED_MEMORY_NAMES - names)
+    if missing_names:
+        raise ValueError(f"consistency metrics missing memories: {', '.join(missing_names)}")
+    for item in metrics:
+        memory_name = _require_non_empty_text(item.get("memory"), "memory")
+        _require_number(item.get("alignment_iou"), f"{memory_name}.alignment_iou")
+        _require_number(item.get("flicker_score"), f"{memory_name}.flicker_score")
+
+
+def _validate_final_report(path: Path) -> None:
+    """校验 final report 是否包含发布审阅所需摘要字段。"""
+
+    text = path.read_text(encoding="utf-8")
+    missing = [phrase for phrase in REQUIRED_REPORT_PHRASES if phrase not in text]
+    if missing:
+        raise ValueError(f"final report missing phrases: {', '.join(missing)}")
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    """读取 JSON 对象并校验顶层类型。"""
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid JSON artifact: {path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"JSON artifact must be an object: {path}")
+    return payload
+
+
+def _require_dict(value: Any, name: str) -> dict[str, Any]:
+    """校验字段是字典。"""
+
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be an object")
+    return value
+
+
+def _require_list(value: Any, name: str) -> list[dict[str, Any]]:
+    """校验字段是对象列表。"""
+
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{name} must be a non-empty list")
+    items: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"{name}[{index}] must be an object")
+        items.append(item)
+    return items
+
+
+def _metric_memory_names(metrics: list[dict[str, Any]]) -> set[str]:
+    """收集 metrics 中的 memory 名称。"""
+
+    return {
+        memory_name
+        for item in metrics
+        if isinstance(memory_name := item.get("memory"), str) and memory_name.strip()
+    }
+
+
+def _require_non_empty_text(value: Any, name: str) -> str:
+    """校验非空文本。"""
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be non-empty text")
+    return value.strip()
+
+
+def _require_number(value: Any, name: str) -> float:
+    """校验数值字段。"""
+
+    if not isinstance(value, int | float):
+        raise ValueError(f"{name} must be numeric")
+    return float(value)
 
 
 def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
