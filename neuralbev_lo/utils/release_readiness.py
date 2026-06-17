@@ -27,6 +27,7 @@ REQUIRED_SCRIPTS: Final[tuple[str, ...]] = (
     "scripts/eval_posenet.py",
     "scripts/build_bev_memory_demo.py",
     "scripts/build_m3_demo_video.py",
+    "scripts/write_v0_1_report.py",
     "scripts/check_release_readiness.py",
 )
 
@@ -35,6 +36,7 @@ README_REQUIRED_PHRASES: Final[tuple[str, ...]] = (
     "Limitations",
     "data/README.md",
     "docs/release_checklist.md",
+    "scripts/write_v0_1_report.py",
 )
 
 RUNTIME_PATHS: Final[tuple[str, ...]] = (
