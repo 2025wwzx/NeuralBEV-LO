@@ -102,6 +102,19 @@ python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --checkp
 The eval command writes metrics JSON/CSV and a trajectory overlay PNG under the
 chosen output directory.
 
+## Week 8 Learned-Pose BEV Memory Commands
+
+Week 8 connects PoseNet predictions to temporal BEV memory. It writes a
+current / naive / GT-pose / learned-pose comparison image, a trajectory overlay,
+and BEV memory metrics.
+
+```powershell
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week8_kitti_tiny_memory --metrics-dir outputs/metrics/week8_kitti_tiny_memory
+```
+
+The current smoke checkpoint is weak; the expected Week 8 result is a runnable
+comparison plus a documented failure case, not a strong learned map yet.
+
 ## Data
 
 Large datasets are not committed. See `data/README.md` for the expected KITTI layout and environment-variable options.

@@ -131,3 +131,33 @@ notes:
   This records the Week 7 accepted failure case: learned pose does not beat zero-motion on KITTI tiny eval.
   Full KITTI training or a stronger overfit checkpoint is needed before claiming learned odometry quality.
 ```
+
+## 2026-06-17 Week 8 Learned-Pose BEV Memory
+
+```text
+date: 2026-06-17
+run_id: week8_learned_pose_bev_memory_kitti_tiny
+config: configs/eval/kitti_eval.yaml
+train_config: configs/train/posenet_3dof.yaml
+dataset: KITTI Odometry sequence 07, first 5 frames
+checkpoint: outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt
+commands:
+  python -m pytest tests/test_learned_bev_memory.py
+  python -m pytest
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week8_kitti_tiny_memory --metrics-dir outputs/metrics/week8_kitti_tiny_memory
+result:
+  Week 8 tests passed: 4 passed in tests/test_learned_bev_memory.py.
+  Full test suite passed: 56 passed.
+  Four-panel memory image, trajectory overlay, and metrics JSON were generated.
+  GT-pose remains the upper bound with mean_abs_error 0.0 and occupancy_iou 1.0.
+  naive memory: mean_abs_error 0.016233, occupancy_iou 0.689449.
+  learned-pose memory: mean_abs_error 0.026720, occupancy_iou 0.541895.
+artifacts:
+  outputs/figures/week8_kitti_tiny_memory/07_000000_000004_memory.png
+  outputs/figures/week8_kitti_tiny_memory/07_000000_000004_trajectory.png
+  outputs/metrics/week8_kitti_tiny_memory/07_000000_000004_memory_metrics.json
+notes:
+  This is the Week 8 accepted failure case: learned-pose memory is worse than naive memory on the tiny KITTI smoke run.
+  Suspected cause: the checkpoint is smoke-scale and was not trained long enough to produce useful odometry.
+  Full training or a stronger overfit checkpoint is needed before claiming learned-pose BEV quality.
+```
