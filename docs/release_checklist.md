@@ -11,6 +11,7 @@ not claim production odometry accuracy.
 - [x] KITTI M1 single-frame BEV render path is documented.
 - [x] KITTI GT-pose memory path is documented.
 - [x] KITTI learned-pose M3 demo path is documented.
+- [x] One-command v0.1 release demo wrapper is documented.
 - [x] M3 demo video command is documented.
 - [x] v0.1 final report command is documented.
 - [x] Failure cases and limitations are documented in `docs/experiment_log.md`.
@@ -22,6 +23,14 @@ not claim production odometry accuracy.
 - [ ] After approval, create and push tag `v0.1-research-prototype`.
 
 ## Reproducibility Freeze Command Sequence
+
+One-command release demo:
+
+```powershell
+python scripts/run_v0_1_release_demo.py
+```
+
+Expanded command sequence:
 
 ```powershell
 python scripts/check_env.py

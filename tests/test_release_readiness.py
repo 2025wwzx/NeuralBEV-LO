@@ -18,7 +18,7 @@ def test_release_readiness_checks_current_repo() -> None:
 
     assert result.passed, result.format_text()
     assert "required_docs" in result.checks
-    assert result.checks["required_scripts"].detail == "8 paths present"
+    assert result.checks["required_scripts"].detail == "9 paths present"
     assert result.checks["readme_release_content"].status == "pass"
     assert "runtime_artifacts_ignored" in result.checks
     assert "no_tracked_runtime_artifacts" in result.checks

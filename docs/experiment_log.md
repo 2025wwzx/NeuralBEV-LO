@@ -323,6 +323,7 @@ notes:
 date: 2026-06-17
 run_id: week12_v0_1_reproducibility_freeze
 commands:
+  python scripts/run_v0_1_release_demo.py
   python scripts/check_env.py
   python scripts/run_pipeline_smoke.py --synthetic
   python -m pytest
@@ -333,6 +334,7 @@ commands:
   python scripts/write_v0_1_report.py
   python scripts/check_release_readiness.py --allow-pending-tag
 result:
+  One-command v0.1 release demo wrapper now runs BEV memory, video, and final report generation.
   Environment check completed on Python 3.12.10 with RTX 5080 CUDA-enabled PyTorch.
   Synthetic data-to-model smoke completed with loss 0.136254.
   Full test suite passed: 67 passed.
@@ -346,6 +348,8 @@ metrics:
   final occupancy_iou: naive 0.689678, gt_pose 1.0, learned_pose 0.542051.
   mean per-frame consistency: naive alignment 0.744705 / flicker 0.001996; gt_pose alignment 0.791612 / flicker 0.008939; learned_pose alignment 0.612804 / flicker 0.026458.
 artifacts:
+  outputs/figures/v0_1_release_demo/neuralbev_lo_v0_1_release_demo.mp4
+  outputs/reports/v0_1_release_demo.txt
   outputs/checkpoints/week12_synthetic_freeze/posenet_3dof_latest.pt
   outputs/metrics/week12_synthetic_eval/synthetic_eval_metrics.json
   outputs/metrics/week12_synthetic_eval/synthetic_eval_metrics.csv

@@ -201,6 +201,16 @@ Week 12 freezes the v0.1 research-prototype command path. The release readiness
 checker verifies required docs/scripts, runtime artifact ignore rules, and the
 pending release-tag state.
 
+One-command KITTI release demo:
+
+```powershell
+python scripts/run_v0_1_release_demo.py
+```
+
+This command builds learned-pose BEV memory on KITTI sequence 07, saves metrics
+and figures, renders the demo video, and writes a concise final report under
+`outputs/reports/v0_1_release_demo.txt`.
+
 ```powershell
 python scripts/check_env.py
 python scripts/run_pipeline_smoke.py --synthetic
