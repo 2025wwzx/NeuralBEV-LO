@@ -32,6 +32,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Require local v0.1 release demo artifacts to exist and be readable.",
     )
+    parser.add_argument(
+        "--require-clean-git",
+        action="store_true",
+        help="Require a clean working tree and synchronized upstream before tagging.",
+    )
     return parser.parse_args()
 
 
@@ -39,7 +44,11 @@ def main() -> int:
     """运行 release readiness 检查。"""
 
     args = _parse_args()
-    result = collect_release_readiness(args.repo_root, require_artifacts=args.require_artifacts)
+    result = collect_release_readiness(
+        args.repo_root,
+        require_artifacts=args.require_artifacts,
+        require_clean_git=args.require_clean_git,
+    )
     print(result.format_text())
     failing = [
         check

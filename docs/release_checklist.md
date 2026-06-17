@@ -21,6 +21,7 @@ not claim production odometry accuracy.
 - [x] `data/`, `outputs/`, `work/`, checkpoints, and raw arrays are ignored by git.
 - [x] `scripts/check_release_readiness.py --allow-pending-tag` passes.
 - [x] `scripts/check_release_readiness.py --allow-pending-tag --require-artifacts` passes after running the one-command release demo.
+- [x] `scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git` passes after final commit and push.
 - [ ] User explicitly approves creating tag `v0.1-research-prototype`.
 - [ ] After approval, create and push tag `v0.1-research-prototype`.
 
@@ -44,6 +45,7 @@ python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_sa
 python scripts/build_m3_demo_video.py --memory-image outputs/figures/week12_m3_freeze/07_000000_000004_memory.png --trajectory-image outputs/figures/week12_m3_freeze/07_000000_000004_trajectory.png --output outputs/figures/week12_m3_freeze/neuralbev_lo_v0_1_demo.mp4 --seconds 6 --fps 6 --title "NeuralBEV-LO v0.1 research prototype"
 python scripts/write_v0_1_report.py
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
+python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
 python scripts/check_release_readiness.py --allow-pending-tag
 ```
 

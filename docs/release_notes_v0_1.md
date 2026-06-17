@@ -24,6 +24,7 @@ not production-grade odometry.
 ```powershell
 python scripts/run_v0_1_release_demo.py
 python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts
+python scripts/check_release_readiness.py --allow-pending-tag --require-artifacts --require-clean-git
 python -m pytest
 ```
 

@@ -132,6 +132,7 @@ def collect_release_readiness(
     repo_root: str | Path,
     *,
     require_artifacts: bool = False,
+    require_clean_git: bool = False,
 ) -> ReadinessResult:
     """收集当前仓库的 v0.1 release readiness 静态检查。
 
@@ -153,6 +154,8 @@ def collect_release_readiness(
     }
     if require_artifacts:
         checks["release_artifacts"] = _check_release_artifacts(root)
+    if require_clean_git:
+        checks["clean_git_state"] = _check_clean_git_state(root)
     return ReadinessResult(checks=checks)
 
 
@@ -301,6 +304,61 @@ def _check_release_artifacts(root: Path) -> ReadinessCheck:
         name="release_artifacts",
         status="pass",
         detail=f"{len(RELEASE_ARTIFACTS)} artifacts verified",
+    )
+
+
+def _check_clean_git_state(root: Path) -> ReadinessCheck:
+    """检查 tag 前 Git 工作区是否干净，且 upstream 是否同步。"""
+
+    status = _run_git(root, ["status", "--porcelain"])
+    if status.returncode != 0:
+        return ReadinessCheck(
+            name="clean_git_state",
+            status="fail",
+            detail=status.stderr.strip() or "git status failed",
+        )
+    dirty_lines = [line for line in status.stdout.splitlines() if line.strip()]
+    if dirty_lines:
+        preview = "; ".join(dirty_lines[:5])
+        return ReadinessCheck(
+            name="clean_git_state",
+            status="fail",
+            detail=f"uncommitted changes: {preview}",
+        )
+
+    upstream = _run_git(root, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    if upstream.returncode != 0:
+        return ReadinessCheck(
+            name="clean_git_state",
+            status="pass",
+            detail="working tree clean; no upstream configured",
+        )
+    upstream_name = upstream.stdout.strip()
+    sync = _run_git(root, ["rev-list", "--left-right", "--count", "HEAD...@{u}"])
+    if sync.returncode != 0:
+        return ReadinessCheck(
+            name="clean_git_state",
+            status="fail",
+            detail=sync.stderr.strip() or "git upstream sync check failed",
+        )
+    parts = sync.stdout.split()
+    if len(parts) != 2:
+        return ReadinessCheck(
+            name="clean_git_state",
+            status="fail",
+            detail=f"unexpected upstream sync output: {sync.stdout.strip()}",
+        )
+    ahead, behind = int(parts[0]), int(parts[1])
+    if ahead != 0 or behind != 0:
+        return ReadinessCheck(
+            name="clean_git_state",
+            status="fail",
+            detail=f"working tree clean but upstream not synchronized: ahead={ahead}, behind={behind}",
+        )
+    return ReadinessCheck(
+        name="clean_git_state",
+        status="pass",
+        detail=f"working tree clean; upstream synchronized with {upstream_name}",
     )
 
 

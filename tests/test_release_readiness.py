@@ -78,6 +78,23 @@ def _make_minimal_release_repo(root: Path) -> None:
         ),
     )
     _write_text(root / "data/README.md")
+    subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=NeuralBEV Test",
+            "-c",
+            "user.email=neuralbev-test@example.com",
+            "commit",
+            "-m",
+            "init",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _write_release_artifacts(root: Path) -> None:
@@ -201,3 +218,64 @@ def test_release_readiness_cli_can_require_artifacts(tmp_path: Path) -> None:
     )
 
     assert "release_artifacts: pass" in completed.stdout
+
+
+def test_release_readiness_checks_clean_git_state(tmp_path: Path) -> None:
+    """启用 clean-git 检查时应验证工作区干净。"""
+
+    _make_minimal_release_repo(tmp_path)
+
+    result = collect_release_readiness(tmp_path, require_clean_git=True)
+
+    assert result.passed, result.format_text()
+    assert result.checks["clean_git_state"].status == "pass"
+    assert "working tree clean" in result.checks["clean_git_state"].detail
+
+
+def test_release_readiness_clean_git_state_fails_on_dirty_worktree(tmp_path: Path) -> None:
+    """工作区有未提交修改时 clean-git 检查应失败。"""
+
+    _make_minimal_release_repo(tmp_path)
+    _write_text(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "Week 12 Reproducibility Freeze",
+                "Limitations",
+                "data/README.md",
+                "docs/release_checklist.md",
+                "docs/release_notes_v0_1.md",
+                "scripts/run_v0_1_release_demo.py",
+                "scripts/write_v0_1_report.py",
+                "dirty",
+            ]
+        ),
+    )
+
+    result = collect_release_readiness(tmp_path, require_clean_git=True)
+
+    assert not result.passed
+    assert result.checks["clean_git_state"].status == "fail"
+    assert "uncommitted changes" in result.checks["clean_git_state"].detail
+
+
+def test_release_readiness_cli_can_require_clean_git(tmp_path: Path) -> None:
+    """CLI 应支持发布前强制校验 Git 工作区状态。"""
+
+    _make_minimal_release_repo(tmp_path)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/check_release_readiness.py",
+            "--repo-root",
+            str(tmp_path),
+            "--allow-pending-tag",
+            "--require-clean-git",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "clean_git_state: pass" in completed.stdout
