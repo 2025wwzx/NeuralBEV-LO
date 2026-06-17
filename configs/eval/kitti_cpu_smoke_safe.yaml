@@ -1,0 +1,36 @@
+experiment:
+  name: kitti_cpu_smoke_safe
+  seed: 20260608
+
+data:
+  dataset_config: configs/dataset/kitti.yaml
+  sequence: "07"
+
+bev:
+  x_range_m: [0.0, 70.0]
+  y_range_m: [-35.0, 35.0]
+  resolution_m: 0.5
+  channels: ["density", "max_height", "mean_height", "intensity"]
+
+bev_memory:
+  policy: decay
+  alpha: 0.9
+  temporal_window: 5
+
+metrics:
+  occupancy_threshold: 0.1
+  selected_channels: ["density"]
+  flicker_window: 5
+
+runtime:
+  device: cpu
+  amp: false
+  batch_size: 1
+  max_frames: 5
+  num_workers: 0
+  profile_runtime: true
+  notes: "CPU-only smoke path for M0/M1/M2 verification."
+
+filters:
+  z_range_m: [-3.0, 2.0]
+  distance_range_m: [0.0, 70.0]

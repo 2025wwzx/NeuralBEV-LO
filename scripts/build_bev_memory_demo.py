@@ -13,9 +13,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, Iterator
 
 import numpy as np
 import torch
@@ -35,6 +37,7 @@ from neuralbev_lo.data.kitti_dataset import (  # noqa: E402
     list_velodyne_files,
     load_velodyne_frame,
 )
+from neuralbev_lo.data.point_filters import PointFilterConfig, filter_point_cloud_for_bev  # noqa: E402
 from neuralbev_lo.data.pose_utils import (  # noqa: E402
     camera_pose_to_lidar_pose,
     get_velo_to_cam,
@@ -80,9 +83,44 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--pose-source", choices=("gt", "learned"), default="gt")
     parser.add_argument("--checkpoint", type=Path, default=None)
     parser.add_argument("--resolution-m", type=float, default=None)
+    parser.add_argument("--filter-z-range", type=float, nargs=2, default=None, metavar=("MIN_Z", "MAX_Z"))
+    parser.add_argument(
+        "--filter-distance-range",
+        type=float,
+        nargs=2,
+        default=None,
+        metavar=("MIN_R", "MAX_R"),
+    )
+    parser.add_argument("--profile-runtime", action="store_true")
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--cpu", action="store_true")
     return parser.parse_args()
+
+
+class RuntimeProfiler:
+    """按阶段输出 runtime profiling 日志。"""
+
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = bool(enabled)
+
+    @contextmanager
+    def stage(self, name: str, **context: Any) -> Iterator[None]:
+        """记录一个运行阶段的耗时。"""
+
+        if not self.enabled:
+            yield
+            return
+        start_time = time.perf_counter()
+        try:
+            yield
+        finally:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            log_info(
+                "runtime stage completed",
+                stage=name,
+                elapsed_ms=f"{elapsed_ms:.3f}",
+                **context,
+            )
 
 
 def _resolve_data_root(config: dict[str, Any], override: Path | None) -> Path:
@@ -103,6 +141,8 @@ def _resolve_data_root(config: dict[str, Any], override: Path | None) -> Path:
 def _load_bev_config(eval_config: dict[str, Any], train_config_path: Path) -> BevGridConfig:
     """从训练配置读取 BEV grid，保持 Week 3/4/8 的 BEV 定义一致。"""
 
+    if eval_config.get("bev"):
+        return bev_config_from_mapping(eval_config.get("bev", {}))
     configured = PROJECT_ROOT / str(
         eval_config.get("data", {}).get("train_config", train_config_path)
     )
@@ -151,6 +191,35 @@ def _resolve_selected_channel_indices(
     return selected_channels, tuple(indices)
 
 
+def _resolve_point_filter_config(
+    eval_config: dict[str, Any],
+    args: argparse.Namespace,
+) -> PointFilterConfig:
+    """从 eval config 和 CLI 覆盖项解析点云过滤配置。"""
+
+    filter_section = eval_config.get("filters", {})
+    z_range = _optional_range_tuple(args.filter_z_range, filter_section.get("z_range_m"))
+    distance_range = _optional_range_tuple(
+        args.filter_distance_range,
+        filter_section.get("distance_range_m"),
+    )
+    return PointFilterConfig(z_range_m=z_range, distance_range_m=distance_range)
+
+
+def _optional_range_tuple(
+    cli_value: list[float] | tuple[float, float] | None,
+    config_value: object,
+) -> tuple[float, float] | None:
+    """解析 CLI 或 YAML 中的二元范围。"""
+
+    value = cli_value if cli_value is not None else config_value
+    if value is None:
+        return None
+    if not isinstance(value, list | tuple) or len(value) != 2:
+        raise ValueError("filter range must contain exactly two values")
+    return float(value[0]), float(value[1])
+
+
 def _tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
     """把 BEV tensor 复制为 numpy，避免后续 inplace 或引用共享影响历史指标。"""
 
@@ -195,12 +264,15 @@ def _kitti_bev_sequence(
     start_frame: int,
     frames: int,
     config: BevGridConfig,
+    filter_config: PointFilterConfig,
+    profiler: RuntimeProfiler,
 ) -> tuple[list[np.ndarray], np.ndarray, str]:
     """读取 KITTI BEV 序列和 GT relative poses。"""
 
-    paths = build_sequence_paths(data_root, sequence)
-    frame_files = list_velodyne_files(paths.velodyne_dir)
-    lidar_poses = _load_lidar_poses(paths)
+    with profiler.stage("data_loading", source="kitti_metadata", sequence=sequence):
+        paths = build_sequence_paths(data_root, sequence)
+        frame_files = list_velodyne_files(paths.velodyne_dir)
+        lidar_poses = _load_lidar_poses(paths)
     end_frame = min(start_frame + frames, len(frame_files), int(lidar_poses.shape[0]))
     if start_frame < 0 or start_frame >= end_frame:
         raise ValueError(f"start_frame {start_frame} out of range for {len(frame_files)} frames")
@@ -209,8 +281,18 @@ def _kitti_bev_sequence(
 
     bevs: list[np.ndarray] = []
     for frame_index in range(start_frame, end_frame):
-        points = load_velodyne_frame(frame_files[frame_index])
-        bevs.append(rasterize_point_cloud(points, config))
+        with profiler.stage("data_loading", source="kitti_velodyne", frame_index=frame_index):
+            points = load_velodyne_frame(frame_files[frame_index])
+        with profiler.stage("rasterization", frame_index=frame_index):
+            filtered_points = filter_point_cloud_for_bev(points, filter_config)
+            bevs.append(rasterize_point_cloud(filtered_points, config))
+        if filter_config.z_range_m is not None or filter_config.distance_range_m is not None:
+            log_info(
+                "point filter applied",
+                frame_index=frame_index,
+                points_before=points.shape[0],
+                points_after=filtered_points.shape[0],
+            )
     relatives = []
     for frame_index in range(start_frame + 1, end_frame):
         transform = relative_transform(lidar_poses[frame_index - 1], lidar_poses[frame_index])
@@ -353,6 +435,10 @@ def main() -> int:
             bev_config = replace(bev_config, resolution_m=float(args.resolution_m))
         memory_section = eval_config.get("bev_memory", {})
         metrics_section = eval_config.get("metrics", {})
+        runtime_section = eval_config.get("runtime", {})
+        filter_config = _resolve_point_filter_config(eval_config, args)
+        profile_runtime = args.profile_runtime or bool(runtime_section.get("profile_runtime", False))
+        profiler = RuntimeProfiler(profile_runtime)
         memory_config = BevMemoryConfig(
             policy=str(memory_section.get("policy", "decay")),
             alpha=float(memory_section.get("alpha", 0.9)),
@@ -366,7 +452,9 @@ def main() -> int:
             bev_config,
         )
         if args.synthetic:
-            bevs, gt_relative, sequence = _synthetic_bev_sequence(args.frames, bev_config)
+            with profiler.stage("data_loading", source="synthetic"):
+                with profiler.stage("rasterization", source="synthetic"):
+                    bevs, gt_relative, sequence = _synthetic_bev_sequence(args.frames, bev_config)
             start_frame = 0
             end_frame = args.frames - 1
         else:
@@ -377,26 +465,35 @@ def main() -> int:
                 start_frame=args.start_frame,
                 frames=args.frames,
                 config=bev_config,
+                filter_config=filter_config,
+                profiler=profiler,
             )
             start_frame = args.start_frame
             end_frame = args.start_frame + len(bevs) - 1
 
-        device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
+        runtime_device = str(runtime_section.get("device", "")).lower()
+        force_cpu = args.cpu or runtime_device == "cpu"
+        device = torch.device("cpu" if force_cpu or not torch.cuda.is_available() else "cuda")
         learned_relative = None
         if args.pose_source == "learned":
-            learned_relative = _predict_learned_relative(
-                train_config,
-                args.checkpoint,
+            with profiler.stage("inference", device=device.type):
+                learned_relative = _predict_learned_relative(
+                    train_config,
+                    args.checkpoint,
+                    bevs,
+                    device=device,
+                )
+        else:
+            with profiler.stage("inference", device=device.type, skipped=True):
+                learned_relative = None
+        with profiler.stage("warp", memory_policy=memory_config.policy):
+            naive_memory, gt_memory, learned_memory, memory_histories = _update_memories(
                 bevs,
-                device=device,
+                gt_relative,
+                learned_relative,
+                bev_config=bev_config,
+                memory_config=memory_config,
             )
-        naive_memory, gt_memory, learned_memory, memory_histories = _update_memories(
-            bevs,
-            gt_relative,
-            learned_relative,
-            bev_config=bev_config,
-            memory_config=memory_config,
-        )
 
         panels = [
             ("current", bevs[-1]),
@@ -425,29 +522,26 @@ def main() -> int:
         consistency_metrics_path = args.metrics_dir / f"{prefix}_consistency_metrics.json"
         consistency_csv_path = args.metrics_dir / f"{prefix}_consistency_metrics.csv"
         alignment_curve_path = args.output_dir / f"{prefix}_alignment_curve.png"
-        save_bev_comparison(panels, image_path)
-        save_trajectory_overlay(trajectories, trajectory_path, title=f"BEV memory {sequence}")
         metrics_rows = memory_quality_table(
             reference_memory=gt_memory.detach().cpu().numpy(),
             candidates=candidates,
             occupancy_threshold=occupancy_threshold,
         )
-        save_memory_metrics_json(
-            metrics_rows,
-            metrics_path,
-            metadata={
-                "sequence": sequence,
-                "start_frame": start_frame,
-                "end_frame": end_frame,
-                "frames": len(bevs),
-                "pose_source": args.pose_source,
-                "checkpoint": str(args.checkpoint) if args.checkpoint else None,
-                "memory_policy": memory_config.policy,
-                "alpha": memory_config.alpha,
-                "resolution_m": bev_config.resolution_m,
-            },
-        )
-        save_memory_metrics_csv(metrics_rows, metrics_csv_path)
+        memory_metrics_metadata = {
+            "sequence": sequence,
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "frames": len(bevs),
+            "pose_source": args.pose_source,
+            "checkpoint": str(args.checkpoint) if args.checkpoint else None,
+            "memory_policy": memory_config.policy,
+            "alpha": memory_config.alpha,
+            "resolution_m": bev_config.resolution_m,
+            "filter_z_range": filter_config.z_range_m,
+            "filter_distance_range": filter_config.distance_range_m,
+            "device": device.type,
+            "profile_runtime": profile_runtime,
+        }
         consistency_rows = bev_consistency_table(
             current_bevs=bevs,
             memory_histories=memory_histories,
@@ -465,6 +559,10 @@ def main() -> int:
             "memory_policy": memory_config.policy,
             "alpha": memory_config.alpha,
             "resolution_m": bev_config.resolution_m,
+            "filter_z_range": filter_config.z_range_m,
+            "filter_distance_range": filter_config.distance_range_m,
+            "device": device.type,
+            "profile_runtime": profile_runtime,
             "metrics_definition": {
                 "alignment_score": "mean_iou(thresholded_current_bev, thresholded_memory_bev)",
                 "flicker_score": "mean(pixel_std(memory_window, dim=time))",
@@ -474,18 +572,27 @@ def main() -> int:
                 "flicker_window": flicker_window,
             },
         }
-        save_memory_metrics_json(
-            consistency_rows,
-            consistency_metrics_path,
-            metadata=consistency_metadata,
-        )
-        save_memory_metrics_csv(consistency_rows, consistency_csv_path)
-        save_metric_curve(
-            consistency_rows,
-            alignment_curve_path,
-            metric_name="alignment_iou",
-            title=f"BEV alignment IoU {sequence}",
-        )
+        with profiler.stage("rendering"):
+            save_bev_comparison(panels, image_path)
+            save_trajectory_overlay(trajectories, trajectory_path, title=f"BEV memory {sequence}")
+            save_memory_metrics_json(
+                metrics_rows,
+                metrics_path,
+                metadata=memory_metrics_metadata,
+            )
+            save_memory_metrics_csv(metrics_rows, metrics_csv_path)
+            save_memory_metrics_json(
+                consistency_rows,
+                consistency_metrics_path,
+                metadata=consistency_metadata,
+            )
+            save_memory_metrics_csv(consistency_rows, consistency_csv_path)
+            save_metric_curve(
+                consistency_rows,
+                alignment_curve_path,
+                metric_name="alignment_iou",
+                title=f"BEV alignment IoU {sequence}",
+            )
     except Exception as exc:  # noqa: BLE001 - CLI 需要上下文后返回非零。
         log_warn(
             "BEV memory demo failed",
@@ -509,6 +616,9 @@ def main() -> int:
         consistency_metrics=consistency_metrics_path,
         consistency_csv=consistency_csv_path,
         alignment_curve=alignment_curve_path,
+        filter_z_range=filter_config.z_range_m,
+        filter_distance_range=filter_config.distance_range_m,
+        device=device.type,
     )
     return 0
 

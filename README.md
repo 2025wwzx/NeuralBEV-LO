@@ -134,6 +134,23 @@ pixel-wise standard deviation over the configured memory window. These are
 short-sequence engineering indicators; they do not prove global map correctness,
 height consistency, or learned odometry quality.
 
+## Week 10 Robustness and Runtime Commands
+
+Week 10 adds lightweight point filtering variants and optional runtime stage
+logging to the memory demo. Safe eval configs document conservative defaults for
+CPU smoke runs and RTX 5080 runs.
+
+```powershell
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --profile-runtime --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week10_cpu_safe --metrics-dir outputs/metrics/week10_cpu_safe
+python scripts/build_bev_memory_demo.py --config configs/eval/kitti_rtx5080_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --profile-runtime --filter-z-range -1.5 3.0 --filter-distance-range 0.0 50.0 --data-root data/kitti_odometry --output-dir outputs/figures/week10_filtered_smoke --metrics-dir outputs/metrics/week10_filtered_smoke
+```
+
+`--filter-z-range` clips LiDAR points by height before BEV rasterization, and
+`--filter-distance-range` clips by horizontal radial distance. `--profile-runtime`
+prints stage logs for data loading, rasterization, inference, BEV warp, and
+rendering. These logs are for bottleneck diagnosis only; they are not benchmark
+numbers unless the hardware, data range, and thread settings are fixed.
+
 ## Data
 
 Large datasets are not committed. See `data/README.md` for the expected KITTI layout and environment-variable options.

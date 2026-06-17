@@ -211,3 +211,73 @@ notes:
   The learned checkpoint remains smoke-scale and is still worse than naive memory in both tested resolutions.
   Resolution ablation changes rasterizer resolution only; the PoseNet checkpoint is not retrained per resolution.
 ```
+
+## 2026-06-17 Week 10 Robustness, Runtime, and Failure Analysis
+
+```text
+date: 2026-06-17
+run_id: week10_robustness_runtime_failure_analysis
+config:
+  configs/eval/kitti_eval.yaml
+  configs/eval/kitti_cpu_smoke_safe.yaml
+  configs/eval/kitti_rtx5080_safe.yaml
+dataset: KITTI Odometry sequence 07
+checkpoint: outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt
+commands:
+  python scripts/check_env.py
+  python -m pytest tests/test_smoke.py
+  python scripts/render_bev_frame.py --config configs/train/posenet_3dof.yaml --sequence 07 --frame-index 0 --data-root data/kitti_odometry --output-dir outputs/figures/week10_m1_verify
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source gt --sequence 07 --frames 5 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week10_m1_gt_memory_verify --metrics-dir outputs/metrics/week10_m1_gt_memory_verify
+  python scripts/eval_posenet.py --config configs/train/posenet_3dof.yaml --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --data-root data/kitti_odometry --sequence 07 --max-pairs 5 --cpu --output-dir outputs/metrics/week10_m2_verify
+  python -m pytest tests/test_week10_robustness.py
+  python -m pytest tests/test_learned_bev_memory.py tests/test_bev_consistency_metrics.py tests/test_week10_robustness.py
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --start-frame 0 --resolution-m 0.5 --profile-runtime --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week10_failure_case_a_start0_05 --metrics-dir outputs/metrics/week10_failure_case_a_start0_05
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --start-frame 0 --resolution-m 0.25 --profile-runtime --filter-z-range -1.5 3.0 --filter-distance-range 0.0 50.0 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week10_failure_case_b_filtered_025 --metrics-dir outputs/metrics/week10_failure_case_b_filtered_025
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_eval.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --start-frame 20 --resolution-m 0.5 --profile-runtime --filter-z-range -3.0 2.0 --filter-distance-range 0.0 70.0 --data-root data/kitti_odometry --cpu --output-dir outputs/figures/week10_failure_case_c_start20_filtered --metrics-dir outputs/metrics/week10_failure_case_c_start20_filtered
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_cpu_smoke_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --data-root data/kitti_odometry --output-dir outputs/figures/week10_cpu_safe --metrics-dir outputs/metrics/week10_cpu_safe
+  python scripts/build_bev_memory_demo.py --config configs/eval/kitti_rtx5080_safe.yaml --train-config configs/train/posenet_3dof.yaml --pose-source learned --checkpoint outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt --sequence 07 --frames 5 --profile-runtime --filter-z-range -1.5 3.0 --filter-distance-range 0.0 50.0 --data-root data/kitti_odometry --output-dir outputs/figures/week10_filtered_smoke --metrics-dir outputs/metrics/week10_filtered_smoke
+result:
+  M0 environment check completed and tests/test_smoke.py passed: 3 passed.
+  M1 single-frame BEV render and GT-pose memory demo completed.
+  M2 PoseNet eval path completed with zero_motion, constant_velocity, gt_label_echo, and learned baselines.
+  Week 10 tests passed: 3 passed in tests/test_week10_robustness.py.
+  Week 8-10 local tests passed: 11 passed.
+  Runtime logs now report data_loading, rasterization, inference, warp, and rendering stages.
+  Point filters support height clipping and horizontal radial distance clipping before BEV rasterization.
+  Safe config smoke runs completed: CPU safe reported device=cpu; RTX 5080 safe reported device=cuda on this machine.
+safe_configs:
+  CPU smoke: configs/eval/kitti_cpu_smoke_safe.yaml uses device=cpu, amp=false, batch_size=1, max_frames=5, resolution_m=0.5.
+  RTX 5080 conservative: configs/eval/kitti_rtx5080_safe.yaml uses device=cuda, amp=true, batch_size=2, max_frames=20, resolution_m=0.25.
+failure_cases:
+  - id: week10_case_a_start0_05
+    artifact:
+      outputs/figures/week10_failure_case_a_start0_05/07_000000_000004_memory.png
+      outputs/figures/week10_failure_case_a_start0_05/07_000000_000004_trajectory.png
+      outputs/figures/week10_failure_case_a_start0_05/07_000000_000004_alignment_curve.png
+      outputs/metrics/week10_failure_case_a_start0_05/07_000000_000004_memory_metrics.json
+    observation: learned_pose final occupancy_iou 0.541895 is worse than naive 0.689449; learned mean alignment 0.612429 is worse than naive 0.743782 and flicker is higher at 0.026496.
+    suspected_cause: the checkpoint is smoke-scale and predicts adjacent motion poorly, so learned warps smear BEV memory instead of stabilizing it.
+    mitigation_idea: train on full train split, add stronger validation, and reject learned updates when confidence or consistency falls below a threshold.
+  - id: week10_case_b_filtered_025
+    artifact:
+      outputs/figures/week10_failure_case_b_filtered_025/07_000000_000004_memory.png
+      outputs/figures/week10_failure_case_b_filtered_025/07_000000_000004_trajectory.png
+      outputs/figures/week10_failure_case_b_filtered_025/07_000000_000004_alignment_curve.png
+      outputs/metrics/week10_failure_case_b_filtered_025/07_000000_000004_memory_metrics.json
+    observation: with 0.25m BEV plus z/range filtering, learned_pose occupancy_iou drops to 0.182357 while naive remains 0.405640; mean learned alignment is only 0.334335.
+    suspected_cause: finer resolution makes small pose errors more visible, and filtering removes many far/height points so the weak learned pose has less redundant evidence.
+    mitigation_idea: retrain or finetune at the target resolution and tune filters on validation data instead of applying them after a smoke-scale checkpoint.
+  - id: week10_case_c_start20_filtered
+    artifact:
+      outputs/figures/week10_failure_case_c_start20_filtered/07_000020_000024_memory.png
+      outputs/figures/week10_failure_case_c_start20_filtered/07_000020_000024_trajectory.png
+      outputs/figures/week10_failure_case_c_start20_filtered/07_000020_000024_alignment_curve.png
+      outputs/metrics/week10_failure_case_c_start20_filtered/07_000020_000024_memory_metrics.json
+    observation: learned_pose and naive final occupancy_iou are nearly tied, 0.524814 vs 0.525206, but learned flicker is much higher at 0.027997 vs naive 0.003799.
+    suspected_cause: learned updates do not reliably improve short-window alignment and introduce temporal instability even when final IoU looks similar.
+    mitigation_idea: use temporal consistency gating, compare against constant-velocity pose priors, and record per-frame uncertainty before accepting learned memory updates.
+notes:
+  The learned model is still a smoke-level prototype, not a production or SOTA odometry model.
+  Runtime logs are local diagnostic numbers; do not compare them across machines without fixed hardware and thread settings.
+  data/ and outputs/ remain git-ignored runtime directories and must not be committed.
+```
