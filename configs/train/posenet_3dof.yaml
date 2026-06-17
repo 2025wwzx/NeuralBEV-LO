@@ -30,8 +30,15 @@ pose:
     max: [2.738995313644409, 0.31214556097984314, 0.08329317718744278]
     generated_by: scripts/preview_pose_labels.py
 
+model:
+  name: PoseNet3DoF
+  hidden_channels: 32
+  dropout: 0.0
+
 training:
   batch_size: 4
   epochs: 1
   optimizer: AdamW
+  learning_rate: 0.001
+  loss_weights: [1.0, 1.0, 1.0]
   amp: true

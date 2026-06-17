@@ -75,6 +75,19 @@ python scripts/preview_pose_labels.py --config configs/train/posenet_3dof.yaml -
 The pair dataset API returns `(bev_prev, bev_curr, target_pose_3dof, metadata)`
 and is covered by `tests/test_pair_dataset.py`.
 
+## Week 6 PoseNet Smoke Commands
+
+The first learned-odometry baseline is a lightweight CNN PoseNet. It stacks two
+BEV frames by channel and predicts normalized `dx, dy, yaw`.
+
+```powershell
+python scripts/run_pipeline_smoke.py --synthetic
+python scripts/train_posenet_3dof.py --config configs/train/posenet_3dof.yaml --synthetic --cpu --epochs 1 --batch-size 4 --overfit-batches 4 --output-dir outputs/checkpoints/week6_synthetic_smoke
+python scripts/train_posenet_3dof.py --config configs/train/posenet_3dof.yaml --data-root data/kitti_odometry --cpu --epochs 1 --batch-size 2 --max-train-pairs 1 --max-val-pairs 1 --overfit-batches 1 --output-dir outputs/checkpoints/week6_kitti_tiny_smoke
+```
+
+Checkpoints are generated under `outputs/checkpoints/` and are not committed.
+
 ## Data
 
 Large datasets are not committed. See `data/README.md` for the expected KITTI layout and environment-variable options.

@@ -65,3 +65,34 @@ notes:
   These stats are written into configs/train/posenet_3dof.yaml for Week 6 PoseNet target normalization.
   Validation and test sequences are not used for pose-normalization statistics.
 ```
+
+## 2026-06-17 Week 6 PoseNet Smoke
+
+```text
+date: 2026-06-17
+run_id: week6_posenet_smoke
+config: configs/train/posenet_3dof.yaml
+dataset:
+  synthetic BEV pairs for CPU data-to-model smoke and tiny overfit
+  KITTI Odometry tiny subset with max 1 adjacent pair per train/val sequence
+commands:
+  python -m pytest tests/test_posenet_training.py
+  python -m pytest
+  python scripts/run_pipeline_smoke.py --synthetic
+  python scripts/train_posenet_3dof.py --config configs/train/posenet_3dof.yaml --synthetic --cpu --epochs 1 --batch-size 4 --overfit-batches 4 --output-dir outputs/checkpoints/week6_synthetic_smoke
+  python scripts/train_posenet_3dof.py --config configs/train/posenet_3dof.yaml --data-root data/kitti_odometry --cpu --epochs 1 --batch-size 2 --max-train-pairs 1 --max-val-pairs 1 --overfit-batches 1 --output-dir outputs/checkpoints/week6_kitti_tiny_smoke
+result:
+  Week 6 tests passed: 6 passed in tests/test_posenet_training.py.
+  Full test suite passed: 47 passed.
+  Synthetic data-to-model smoke completed with finite loss 0.136254 and prediction shape (2, 3).
+  Synthetic CPU overfit command saved posenet_3dof_latest.pt with train_loss 0.075349 and val_loss 0.107954.
+  KITTI tiny CPU command used 7 train samples and 2 val samples, saving posenet_3dof_latest.pt with train_loss 0.129203.
+artifacts:
+  outputs/checkpoints/week6_synthetic_smoke/posenet_3dof_latest.pt
+  outputs/checkpoints/week6_synthetic_smoke/posenet_3dof_best.pt
+  outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_latest.pt
+  outputs/checkpoints/week6_kitti_tiny_smoke/posenet_3dof_best.pt
+notes:
+  This is a smoke-scale Week 6 baseline, not a full KITTI training run.
+  The CLI supports both --overfit-batches and --overfit_batches spellings.
+```

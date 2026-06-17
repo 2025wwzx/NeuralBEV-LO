@@ -3,6 +3,7 @@ data/kitti_odometry/
 data/raw/
 data/cache/
 outputs/
+work/
 *.ckpt
 *.pth
 *.pt
